@@ -1,0 +1,11 @@
+streamlit
+openai
+firebase-admin
+Pillow
+google-auth
+requests
+pandas
+plotly
+streamlit-agraph
+streamlit-ace
+streamlit-cropper

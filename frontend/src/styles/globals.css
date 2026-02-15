@@ -1,0 +1,253 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
+
+/* ── Base ───────────────────────────────────────────────────────── */
+
+:root {
+  --bg-primary: #0d1117;
+  --bg-secondary: #161b22;
+  --bg-tertiary: #21262d;
+  --border: #30363d;
+  --text-primary: #c9d1d9;
+  --text-secondary: #8b949e;
+  --accent-green: #238636;
+  --accent-blue: #58a6ff;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Scrollbar ──────────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #484f58;
+}
+
+/* ── Glass Card ─────────────────────────────────────────────────── */
+
+.glass-card {
+  background: rgba(22, 27, 34, 0.8);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* ── Chat bubbles ───────────────────────────────────────────────── */
+
+.chat-bubble-user {
+  background: rgba(35, 134, 54, 0.15);
+  border: 1px solid rgba(35, 134, 54, 0.3);
+  border-radius: 12px 12px 4px 12px;
+  padding: 12px 16px;
+  max-width: 80%;
+  margin-left: auto;
+}
+
+.chat-bubble-ai {
+  background: rgba(22, 27, 34, 0.8);
+  border: 1px solid var(--border);
+  border-radius: 12px 12px 12px 4px;
+  padding: 12px 16px;
+  max-width: 80%;
+}
+
+/* ── Markdown content ───────────────────────────────────────────── */
+
+.markdown-body {
+  color: var(--text-primary);
+  line-height: 1.7;
+}
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3 {
+  color: #e6edf3;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+  font-weight: 600;
+}
+.markdown-body code {
+  background: rgba(110, 118, 129, 0.2);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+.markdown-body pre {
+  background: #161b22;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px;
+  overflow-x: auto;
+}
+.markdown-body pre code {
+  background: none;
+  padding: 0;
+}
+.markdown-body ul,
+.markdown-body ol {
+  padding-left: 1.5em;
+}
+.markdown-body a {
+  color: var(--accent-blue);
+  text-decoration: none;
+}
+.markdown-body a:hover {
+  text-decoration: underline;
+}
+
+/* ── Badge chip ─────────────────────────────────────────────────── */
+
+.badge-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+}
+
+/* ── Loading spinner ────────────────────────────────────────────── */
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent-green);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Responsive ─────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .glass-card {
+    padding: 12px;
+  }
+  .chat-bubble-user,
+  .chat-bubble-ai {
+    max-width: 95%;
+  }
+}
+
+/* ── Boot Animation ─────────────────────────────────────────────── */
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- Loading Screen (matches original Streamlit) --- */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  width: 100vw;
+  position: fixed;
+  top: 0;
+  left: 0;
+  background: #0a0118;
+  z-index: 9999;
+  font-family: "Inter", sans-serif;
+  transition: opacity 0.6s ease-out;
+  opacity: 1;
+}
+
+.loading-container.fade-out {
+  opacity: 0;
+}
+
+.cyber-brain-container {
+  width: 120px;
+  height: 120px;
+  position: relative;
+  filter: drop-shadow(0 0 20px rgba(100, 100, 255, 0.3));
+  animation: brain-pulse 15s ease-in-out infinite;
+}
+
+@keyframes brain-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+.cyber-brain-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.brain-outline {
+  fill: rgba(20, 20, 50, 0.7);
+  stroke: rgba(120, 120, 255, 0.4);
+  stroke-width: 1;
+}
+
+.brain-veins {
+  fill: none;
+  stroke: #7efcff;
+  stroke-width: 1.2;
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: liquid-fill 10s ease-out forwards;
+  opacity: 0.6;
+}
+
+@keyframes liquid-fill {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.loading-text {
+  margin-top: 20px;
+  font-size: 14px;
+  color: #888;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}

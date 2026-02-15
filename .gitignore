@@ -1,0 +1,43 @@
+# Secrets & credentials — NEVER commit these
+.streamlit/secrets.toml
+firebase_credentials.json
+*.env
+.env
+.env.local
+backend/.env
+!.env.example
+!frontend/.env.production
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+backend/venv/
+
+# Node / Next.js
+node_modules/
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+workspace.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build outputs
+*.pyflakes*
+search_results.json
+defs_results.json
+pyflakes_*.txt

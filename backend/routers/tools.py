@@ -1,0 +1,158 @@
+"""
+EduAI Backend — Tools Router
+Career path, summarizer, and dashboard endpoints.
+"""
+
+from fastapi import APIRouter, HTTPException, Depends
+
+from models.schemas import (
+    CareerRequest, CareerResponse,
+    SummarizerRequest, SummarizerResponse,
+    DashboardResponse, GamificationStats, GreetingResponse,
+    VisionRequest, VisionResponse,
+)
+from services import ai_service as ai
+from services import firebase_service as fb
+from auth_utils import get_current_user
+
+router = APIRouter(prefix="/api/tools", tags=["tools"])
+
+
+# ── Career Path ────────────────────────────────────────────────────────────────
+
+@router.post("/career", response_model=CareerResponse)
+async def career_path(req: CareerRequest, user=Depends(get_current_user)):
+    """Generate personalized career path recommendations."""
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+        paths_md = await loop.run_in_executor(
+            None,
+            lambda: ai.generate_career_paths(
+                req.interests, req.skills, req.education,
+                req.location, req.aspirations, req.budget,
+            ),
+        )
+        skills_gap = None
+        if req.skills:
+            skills_gap = await loop.run_in_executor(
+                None,
+                lambda: ai.generate_skills_gap(req.skills),
+            )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return CareerResponse(paths_markdown=paths_md, skills_gap=skills_gap)
+
+
+@router.post("/career-guest", response_model=CareerResponse)
+async def career_path_guest(req: CareerRequest):
+    """Generate career paths for guest users (no auth required)."""
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+        paths_md = await loop.run_in_executor(
+            None,
+            lambda: ai.generate_career_paths(
+                req.interests, req.skills, req.education,
+                req.location, req.aspirations, req.budget,
+            ),
+        )
+        skills_gap = None
+        if req.skills:
+            skills_gap = await loop.run_in_executor(
+                None,
+                lambda: ai.generate_skills_gap(req.skills),
+            )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return CareerResponse(paths_markdown=paths_md, skills_gap=skills_gap)
+
+
+# ── Summarizer ─────────────────────────────────────────────────────────────────
+
+@router.post("/summarize", response_model=SummarizerResponse)
+async def summarize(req: SummarizerRequest, user=Depends(get_current_user)):
+    """Summarize text in the requested format."""
+    if not req.text.strip():
+        raise HTTPException(status_code=400, detail="Text cannot be empty")
+    try:
+        summary = ai.generate_summary(req.text, req.format.value)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return SummarizerResponse(summary=summary)
+
+
+# ── Dashboard ──────────────────────────────────────────────────────────────────
+
+@router.get("/dashboard", response_model=DashboardResponse)
+async def dashboard(user=Depends(get_current_user)):
+    """Get full dashboard data: stats, badges, activity."""
+    uid = user["uid"]
+    paths = fb.get_learning_paths(uid)
+
+    # Compute gamification
+    gamification = fb.compute_gamification(uid, paths)
+
+    # Activity by path
+    activity_by_path = {}
+    for name, data in paths.items():
+        if isinstance(data, dict):
+            activity_by_path[name] = len(data.get("chat_history", []))
+
+    stats = GamificationStats(
+        xp=gamification["xp"],
+        level=gamification["level"],
+        badges=gamification["badges"],
+        total_messages=gamification["total_messages"],
+        total_paths=gamification["total_paths"],
+    )
+
+    return DashboardResponse(
+        stats=stats,
+        activity_by_path=activity_by_path,
+    )
+
+
+# ── Vision Solver ──────────────────────────────────────────────────────────────
+
+@router.post("/vision", response_model=VisionResponse)
+async def vision_solve(req: VisionRequest):
+    """Analyze an image using a vision model. No auth required."""
+    import asyncio
+    if not req.image_base64.strip():
+        raise HTTPException(status_code=400, detail="Image data cannot be empty")
+    try:
+        loop = asyncio.get_event_loop()
+        answer, model_used = await loop.run_in_executor(
+            None,
+            lambda: ai.solve_vision(req.image_base64, req.prompt),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return VisionResponse(answer=answer, model_used=model_used)
+
+
+# ── Greeting ───────────────────────────────────────────────────────────────────
+
+@router.get("/greeting", response_model=GreetingResponse)
+async def greeting(user=Depends(get_current_user)):
+    """Get a context-aware greeting."""
+    profile = fb.get_user_profile(user["uid"])
+    paths = fb.get_learning_paths(user["uid"])
+    total_msgs = sum(
+        len(p.get("chat_history", []))
+        for p in paths.values()
+        if isinstance(p, dict)
+    )
+
+    g = fb.get_greeting(profile.get("nickname", ""))
+    return GreetingResponse(
+        greeting=g["greeting"],
+        tip=g["tip"],
+        total_paths=len(paths),
+        total_messages=total_msgs,
+        date_display=g["date_display"],
+    )
