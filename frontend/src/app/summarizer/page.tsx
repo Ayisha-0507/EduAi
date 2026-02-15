@@ -22,14 +22,15 @@ const FORMATS = [
 ];
 
 export default function SummarizerPage() {
-  const { token } = useAuthStore();
+  const { token, isGuest } = useAuthStore();
   const [text, setText] = useState("");
   const [format, setFormat] = useState(FORMATS[0]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState("");
 
   const handleSubmit = async () => {
-    if (!token || !text.trim()) return;
+    if (!text.trim()) return;
+    if (!token && !isGuest) return;
     setLoading(true);
     try {
       const res = await api.summarize(token, text, format);

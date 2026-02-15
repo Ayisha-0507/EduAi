@@ -169,11 +169,12 @@ export const api = {
       token
     ),
 
-  summarize: (token: string, text: string, format: string) =>
-    request<{ summary: string }>("/api/tools/summarize", {
-      method: "POST",
-      body: JSON.stringify({ text, format }),
-    }, token),
+  summarize: (token: string | null, text: string, format: string) =>
+    request<{ summary: string }>(
+      token ? "/api/tools/summarize" : "/api/tools/summarize-guest",
+      { method: "POST", body: JSON.stringify({ text, format }) },
+      token
+    ),
 
   getDashboard: (token: string) =>
     request<{

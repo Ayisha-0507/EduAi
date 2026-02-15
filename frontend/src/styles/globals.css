@@ -155,12 +155,32 @@ body {
 /* ── Responsive ─────────────────────────────────────────────────── */
 
 @media (max-width: 768px) {
+  html {
+    font-size: 17px;
+  }
   .glass-card {
-    padding: 12px;
+    padding: 14px;
   }
   .chat-bubble-user,
   .chat-bubble-ai {
     max-width: 95%;
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+  h1 {
+    font-size: 1.5rem !important;
+  }
+  h2 {
+    font-size: 1.25rem !important;
+  }
+  p, li, span, label, textarea, input, select, button {
+    font-size: 0.95rem;
+  }
+  .text-xs {
+    font-size: 0.8rem !important;
+  }
+  .text-sm {
+    font-size: 0.9rem !important;
   }
 }
 

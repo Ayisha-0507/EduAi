@@ -80,11 +80,30 @@ async def summarize(req: SummarizerRequest, user=Depends(get_current_user)):
     """Summarize text in the requested format."""
     if not req.text.strip():
         raise HTTPException(status_code=400, detail="Text cannot be empty")
+    import asyncio
+    loop = asyncio.get_event_loop()
     try:
-        summary = ai.generate_summary(req.text, req.format.value)
+        summary = await loop.run_in_executor(
+            None, lambda: ai.generate_summary(req.text, req.format.value)
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    return SummarizerResponse(summary=summary)
 
+
+@router.post("/summarize-guest", response_model=SummarizerResponse)
+async def summarize_guest(req: SummarizerRequest):
+    """Summarize text for guest users (no auth required)."""
+    if not req.text.strip():
+        raise HTTPException(status_code=400, detail="Text cannot be empty")
+    import asyncio
+    loop = asyncio.get_event_loop()
+    try:
+        summary = await loop.run_in_executor(
+            None, lambda: ai.generate_summary(req.text, req.format.value)
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
     return SummarizerResponse(summary=summary)
 
 
