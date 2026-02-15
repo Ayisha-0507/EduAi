@@ -28,9 +28,14 @@ class Settings:
     # Fallback models if primary fails (tried in order)
     FALLBACK_MODELS: list = [
         "meta-llama/llama-3.3-8b-instruct:free",
+        "mistralai/mistral-small-3.1-24b-instruct:free",
         "qwen/qwen3-8b:free",
         "google/gemma-3-12b-it:free",
     ]
+
+    # Rate limit retry settings
+    RATE_LIMIT_RETRIES: int = 2
+    RATE_LIMIT_DELAY: float = 3.0  # seconds between retries
 
     # ── Firebase ────────────────────────────────────────────────────────
     FIREBASE_CREDENTIALS_PATH: str = os.getenv(

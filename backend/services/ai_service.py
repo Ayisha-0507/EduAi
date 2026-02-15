@@ -7,6 +7,7 @@ Ported from app.py's _call_openrouter, _auto_route, detect_emotion_and_adapt.
 from __future__ import annotations
 import json
 import re
+import time
 import httpx
 from openai import OpenAI
 from config import settings
@@ -77,7 +78,9 @@ def auto_route(prompt: str) -> str:
         return "deepseek"
     if any(k in p for k in rp_kw):
         return "nous"
-    return "deepseek"
+    # Rotate default model to spread load across free-tier rate limits
+    import random
+    return random.choice(["deepseek", "nous", "arcee"])
 
 
 # ── Emotion Detection ──────────────────────────────────────────────────────────
@@ -153,13 +156,19 @@ RESPONSE_STYLE_PROMPTS = {
 
 # ── Core Chat Call ─────────────────────────────────────────────────────────────
 
+def _is_rate_limit_error(err: Exception) -> bool:
+    """Check if an error is a rate-limit (429) error."""
+    err_str = str(err).lower()
+    return "429" in err_str or "rate limit" in err_str or "rate_limit" in err_str or "too many requests" in err_str
+
+
 def call_ai(
     messages: list[dict],
     model_hint: str | None = None,
     is_json: bool = False,
     temperature: float = 0.7,
 ) -> str | None:
-    """Send a request to OpenRouter and return the response text."""
+    """Send a request to OpenRouter with automatic retry on rate limits and multi-model fallback."""
     client = get_client()
     model_id = pick_model(model_hint)
 
@@ -172,29 +181,41 @@ def call_ai(
     if is_json:
         kwargs["response_format"] = {"type": "json_object"}
 
-    try:
-        resp = client.chat.completions.create(**kwargs)
-        return resp.choices[0].message.content
-    except Exception as primary_err:
-        # Try each fallback model in order
-        last_err = primary_err
-        for fb_model in settings.FALLBACK_MODELS:
-            try:
-                fb_kwargs = {**kwargs, "model": fb_model}
-                # Some models don't support system messages — merge into user
-                if "gemma" in fb_model:
-                    fb_kwargs["messages"] = _strip_system_messages(messages)
-                # Some free models don't support response_format — remove it to avoid errors
-                if "response_format" in fb_kwargs:
-                    fb_kwargs.pop("response_format", None)
-                resp = client.chat.completions.create(**fb_kwargs)
-                return resp.choices[0].message.content
-            except Exception as fb_err:
-                last_err = fb_err
+    # Try primary model with rate-limit retry
+    for attempt in range(1 + settings.RATE_LIMIT_RETRIES):
+        try:
+            resp = client.chat.completions.create(**kwargs)
+            return resp.choices[0].message.content
+        except Exception as primary_err:
+            if _is_rate_limit_error(primary_err) and attempt < settings.RATE_LIMIT_RETRIES:
+                time.sleep(settings.RATE_LIMIT_DELAY * (attempt + 1))
                 continue
-        raise RuntimeError(
-            f"AI error ({model_id}): {primary_err} | All fallbacks failed. Last: {last_err}"
-        )
+            # Not a rate limit or retries exhausted — fall through to fallbacks
+            break
+
+    # Try each fallback model in order
+    last_err: Exception = Exception("No models available")
+    for fb_model in settings.FALLBACK_MODELS:
+        if fb_model == model_id:
+            continue  # Skip if same as primary
+        try:
+            fb_kwargs = {**kwargs, "model": fb_model}
+            # Some models don't support system messages — merge into user
+            if "gemma" in fb_model:
+                fb_kwargs["messages"] = _strip_system_messages(messages)
+            # Some free models don't support response_format — remove it
+            if "response_format" in fb_kwargs:
+                fb_kwargs.pop("response_format", None)
+            resp = client.chat.completions.create(**fb_kwargs)
+            return resp.choices[0].message.content
+        except Exception as fb_err:
+            last_err = fb_err
+            if _is_rate_limit_error(fb_err):
+                time.sleep(1)  # Brief pause before next fallback
+            continue
+    raise RuntimeError(
+        f"AI error ({model_id}): All models rate-limited or failed. Last: {last_err}"
+    )
 
 
 def _strip_system_messages(messages: list[dict]) -> list[dict]:
@@ -246,10 +267,10 @@ def generate_flashcards(topic: str, num_cards: int = 10) -> list[dict]:
         {"role": "system", "content": "You are a flashcard generator. Return ONLY a JSON array of objects with 'question' and 'answer' keys. No markdown, no explanation, no code fences."},
         {"role": "user", "content": f"Generate exactly {num_cards} educational flashcards about: {topic}. Each card should test a key concept. Return as JSON array."},
     ]
-    resp = call_ai(messages, model_hint="deepseek", is_json=True)
+    resp = call_ai(messages, model_hint="arcee", is_json=True)
     if not resp:
         # Retry without JSON mode in case model doesn't support it
-        resp = call_ai(messages, model_hint="deepseek", is_json=False)
+        resp = call_ai(messages, model_hint="arcee", is_json=False)
     if resp:
         try:
             # Strip markdown code fences if present
@@ -313,7 +334,7 @@ def generate_learning_path_topics(goal: str) -> list[str]:
         {"role": "system", "content": "You are a curriculum designer. Return ONLY a JSON array of 5-7 topic strings for a learning path. No explanations."},
         {"role": "user", "content": f"Create a learning path for: {goal}"},
     ]
-    resp = call_ai(messages, model_hint="deepseek", is_json=True)
+    resp = call_ai(messages, model_hint="nous", is_json=True)
     if resp:
         try:
             data = json.loads(resp)
@@ -342,7 +363,7 @@ def generate_quiz(topic: str, num_questions: int = 5) -> list[dict] | None:
         },
         {"role": "user", "content": f"Topic: {topic}"},
     ]
-    resp = call_ai(messages, model_hint="deepseek", is_json=True)
+    resp = call_ai(messages, model_hint="arcee", is_json=True)
     return parse_quiz_response(resp)
 
 
@@ -393,7 +414,7 @@ def generate_career_paths(interests: str, skills: str, education: str, location:
         {"role": "system", "content": "You are a career counselor AI."},
         {"role": "user", "content": prompt},
     ]
-    return call_ai(messages, model_hint="deepseek") or ""
+    return call_ai(messages, model_hint="nous") or ""
 
 
 def generate_skills_gap(skills: str) -> dict | None:
@@ -402,7 +423,7 @@ def generate_skills_gap(skills: str) -> dict | None:
         {"role": "system", "content": "Return ONLY a JSON object with skill names as keys and proficiency 0-100 as values. No markdown."},
         {"role": "user", "content": f"Based on these current skills ({skills}), rate proficiency for 6-8 relevant career skills."},
     ]
-    resp = call_ai(messages, model_hint="deepseek", is_json=True)
+    resp = call_ai(messages, model_hint="nous", is_json=True)
     if resp:
         try:
             return json.loads(resp) if isinstance(resp, str) else resp
@@ -428,7 +449,7 @@ def generate_summary(text: str, format_name: str) -> str:
         {"role": "system", "content": "You are an educational summarizer."},
         {"role": "user", "content": f"Instructions: {instruction}\n\nTEXT TO SUMMARIZE:\n{truncated}"},
     ]
-    return call_ai(messages, model_hint="deepseek") or ""
+    return call_ai(messages, model_hint="arcee") or ""
 
 
 def generate_feynman_response(user_message: str, history: list[dict]) -> str:
@@ -490,9 +511,9 @@ def debate_round(
             {"role": "system", "content": system},
             {"role": "user", "content": f"Begin your opening argument {ai_stance} the topic: {topic}"},
         ]
-        resp = call_ai(messages, model_hint="deepseek", is_json=True)
+        resp = call_ai(messages, model_hint="nous", is_json=True)
         if not resp:
-            resp = call_ai(messages, model_hint="deepseek", is_json=False)
+            resp = call_ai(messages, model_hint="nous", is_json=False)
 
         ai_arg = topic  # fallback
         if resp:
@@ -541,9 +562,9 @@ def debate_round(
         messages.append({"role": "assistant", "content": f"Previous rounds:{history_text}"})
     messages.append({"role": "user", "content": f"Student's argument ({user_stance}): {user_argument}"})
 
-    resp = call_ai(messages, model_hint="deepseek", is_json=True)
+    resp = call_ai(messages, model_hint="nous", is_json=True)
     if not resp:
-        resp = call_ai(messages, model_hint="deepseek", is_json=False)
+        resp = call_ai(messages, model_hint="nous", is_json=False)
 
     # Parse response
     result = {
@@ -602,9 +623,9 @@ def debate_final(topic: str, user_stance: str, history: list[dict]) -> dict:
         {"role": "user", "content": "Judge this debate and provide the final verdict."},
     ]
 
-    resp = call_ai(messages, model_hint="deepseek", is_json=True)
+    resp = call_ai(messages, model_hint="nous", is_json=True)
     if not resp:
-        resp = call_ai(messages, model_hint="deepseek", is_json=False)
+        resp = call_ai(messages, model_hint="nous", is_json=False)
 
     # Defaults
     result = {
