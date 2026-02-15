@@ -6,7 +6,7 @@
 // Prefer env override; fall back to production Render URL to avoid 404s on GitHub Pages
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
-  "https://eduai-backend.onrender.com" ||
+  "https://eduai-9ntm.onrender.com" ||
   "http://localhost:8000";
 
 // ── Helper ────────────────────────────────────────────────────────────────────
