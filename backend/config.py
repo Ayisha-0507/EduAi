@@ -17,9 +17,9 @@ class Settings:
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
 
     AI_MODELS: dict = {
-        "deepseek":    "deepseek/deepseek-chat-v3-0324:free",
-        "arcee":       "meta-llama/llama-3.3-8b-instruct:free",
-        "nous":        "mistralai/mistral-small-3.1-24b-instruct:free",
+        "deepseek":    "google/gemma-2-9b-it:free",
+        "arcee":       "meta-llama/llama-3.2-3b-instruct:free",
+        "nous":        "qwen/qwen-2.5-7b-instruct:free",
         "blackforest": "black-forest-labs/flux.2-klein-4b",
         "nemotron":    "nvidia/nemotron-nano-12b-v2-vl:free",
         "qwen_vl":     "qwen/qwen2.5-vl-72b-instruct:free",
@@ -28,10 +28,10 @@ class Settings:
 
     # Fallback models if primary fails (tried in order)
     FALLBACK_MODELS: list = [
-        "meta-llama/llama-3.3-8b-instruct:free",
-        "mistralai/mistral-small-3.1-24b-instruct:free",
-        "qwen/qwen3-8b:free",
-        "google/gemma-3-12b-it:free",
+        "google/gemma-2-9b-it:free",
+        "meta-llama/llama-3.2-3b-instruct:free",
+        "qwen/qwen-2.5-7b-instruct:free",
+        "microsoft/phi-3-mini-128k-instruct:free",
     ]
 
     # Rate limit retry settings
