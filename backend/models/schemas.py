@@ -256,6 +256,21 @@ class VisionResponse(BaseModel):
 
 # ── Greeting ──────────────────────────────────────────────────────────────────
 
+class FlashcardRequest(BaseModel):
+    topic: str
+    num_cards: int = 10
+
+
+class Flashcard(BaseModel):
+    question: str
+    answer: str
+
+
+class FlashcardResponse(BaseModel):
+    cards: list[Flashcard]
+    topic: str
+
+
 class GreetingResponse(BaseModel):
     greeting: str
     tip: str

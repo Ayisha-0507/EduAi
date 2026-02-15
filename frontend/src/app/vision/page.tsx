@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import { FiCamera, FiUpload, FiX, FiLoader } from "react-icons/fi";
+import { FiCamera, FiUpload, FiX, FiLoader, FiArrowLeft } from "react-icons/fi";
+import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { api } from "@/lib/api";
 
 export default function VisionPage() {
+  const router = useRouter();
   const [imageData, setImageData] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [prompt, setPrompt] = useState(
@@ -108,14 +110,23 @@ export default function VisionPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-white mb-1">
-          Live Vision Solver
-        </h1>
-        <p className="text-gray-400">
-          Snap a photo or upload an image of a math problem, diagram, or code
-          snippet. The AI will analyze and solve it!
-        </p>
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => router.back()}
+          className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white transition-colors border border-gray-700"
+          title="Go back"
+        >
+          <FiArrowLeft size={20} />
+        </button>
+        <div>
+          <h1 className="text-2xl font-bold text-white mb-1">
+            Live Vision Solver
+          </h1>
+          <p className="text-gray-400">
+            Snap a photo or upload an image of a math problem, diagram, or code
+            snippet. The AI will analyze and solve it!
+          </p>
+        </div>
       </div>
 
       {/* Image Input Area */}

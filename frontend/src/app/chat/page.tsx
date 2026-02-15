@@ -22,6 +22,8 @@ import {
   FiChevronLeft,
   FiMic,
   FiMicOff,
+  FiPaperclip,
+  FiX,
 } from "react-icons/fi";
 
 const STYLE_BUTTONS = [
@@ -65,8 +67,11 @@ export default function ChatPage() {
   const [selectedDate, setSelectedDate] = useState(todayKey());
   const [showDatePanel, setShowDatePanel] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [attachedImage, setAttachedImage] = useState<string | null>(null);
+  const [attachedPreview, setAttachedPreview] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const dates = getChatDates();
   // Derive messages directly from the store — no stale closures
@@ -101,6 +106,24 @@ export default function ChatPage() {
     setIsListening(true);
   };
 
+  const handleImageAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      setAttachedPreview(dataUrl);
+      setAttachedImage(dataUrl.split(",")[1]);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const clearAttachment = () => {
+    setAttachedImage(null);
+    setAttachedPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   // Load greeting on mount
   useEffect(() => {
     if (token) {
@@ -114,17 +137,20 @@ export default function ChatPage() {
   }, [messages]);
 
   const handleSend = async () => {
-    if (!input.trim() || loading) return;
+    if ((!input.trim() && !attachedImage) || loading) return;
 
     // Capture input before clearing
     const msg = input.trim();
+    const hasImage = !!attachedImage;
+    const imageToSend = attachedImage;
     const userMsg: ChatMessage = {
       role: "user",
-      content: msg,
+      content: hasImage ? `${msg || "(image)"}\n📎 Image attached` : msg,
       timestamp: Date.now(),
     };
     addChatMessage(userMsg);
     setInput("");
+    clearAttachment();
     setLoading(true);
 
     // Switch to today if viewing old date
@@ -132,7 +158,11 @@ export default function ChatPage() {
 
     try {
       let res;
-      if (isGuest || !token) {
+      if (hasImage && imageToSend) {
+        // Image attached — use vision endpoint
+        const visionRes = await api.chatWithImage(imageToSend, msg || "Describe this image");
+        res = { reply: visionRes.answer, model_used: visionRes.model_used, emotion_detected: undefined };
+      } else if (isGuest || !token) {
         // Guest mode — use unauthenticated endpoint
         res = await api.sendGuestMessage({
           message: msg,
@@ -376,6 +406,28 @@ export default function ChatPage() {
 
           {/* Input */}
           <div className="px-6 py-3 border-t border-border-default bg-bg-secondary/50">
+            {/* Image preview strip */}
+            {attachedPreview && (
+              <div className="max-w-4xl mx-auto mb-2 flex items-center gap-2">
+                <div className="relative inline-block">
+                  <img src={attachedPreview} alt="Attached" className="h-16 w-16 object-cover rounded-lg border border-border-default" />
+                  <button
+                    onClick={clearAttachment}
+                    className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 transition"
+                  >
+                    <FiX size={12} />
+                  </button>
+                </div>
+                <span className="text-xs text-text-secondary">Image attached</span>
+              </div>
+            )}
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/*"
+              className="hidden"
+              onChange={handleImageAttach}
+            />
             <div className="flex gap-2 max-w-4xl mx-auto">
               <button
                 onClick={toggleVoice}
@@ -388,6 +440,14 @@ export default function ChatPage() {
                 title={isListening ? "Stop listening" : "Voice input"}
               >
                 {isListening ? <FiMicOff size={18} /> : <FiMic size={18} />}
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={!isToday}
+                className="px-3 py-3 rounded-lg bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default transition disabled:opacity-50"
+                title="Attach image"
+              >
+                <FiPaperclip size={18} />
               </button>
               <input
                 type="text"
@@ -402,7 +462,7 @@ export default function ChatPage() {
               />
               <button
                 onClick={handleSend}
-                disabled={loading || !input.trim() || !isToday}
+                disabled={loading || (!input.trim() && !attachedImage) || !isToday}
                 className="px-4 py-3 bg-accent-green hover:bg-accent-greenHover text-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <FiSend size={18} />

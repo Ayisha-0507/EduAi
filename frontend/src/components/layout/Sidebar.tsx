@@ -20,12 +20,14 @@ import {
   FiX,
   FiSettings,
   FiCamera,
+  FiLayers,
 } from "react-icons/fi";
 import { useState, useCallback } from "react";
 
 const navItems = [
   { href: "/chat", label: "Home Chat", icon: FiMessageSquare },
   { href: "/vision", label: "Vision Solver", icon: FiCamera },
+  { href: "/flashcards", label: "Flashcards", icon: FiLayers },
   { href: "/learn", label: "Learning Paths", icon: FiBook },
   { href: "/dashboard", label: "Dashboard", icon: FiBarChart2 },
   { href: "/feynman", label: "Feynman Board", icon: FiCpu },

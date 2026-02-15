@@ -10,6 +10,7 @@ from models.schemas import (
     SummarizerRequest, SummarizerResponse,
     DashboardResponse, GamificationStats, GreetingResponse,
     VisionRequest, VisionResponse,
+    FlashcardRequest, FlashcardResponse,
 )
 from services import ai_service as ai
 from services import firebase_service as fb
@@ -133,6 +134,25 @@ async def vision_solve(req: VisionRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return VisionResponse(answer=answer, model_used=model_used)
+
+
+# ── Flashcard Generator ───────────────────────────────────────────────────────
+
+@router.post("/flashcards", response_model=FlashcardResponse)
+async def generate_flashcards(req: FlashcardRequest):
+    """Generate flashcards from a topic. No auth required."""
+    import asyncio
+    if not req.topic.strip():
+        raise HTTPException(status_code=400, detail="Topic cannot be empty")
+    try:
+        loop = asyncio.get_event_loop()
+        cards = await loop.run_in_executor(
+            None,
+            lambda: ai.generate_flashcards(req.topic, req.num_cards),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return FlashcardResponse(cards=cards, topic=req.topic)
 
 
 # ── Greeting ───────────────────────────────────────────────────────────────────

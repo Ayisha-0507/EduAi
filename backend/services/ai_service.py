@@ -237,6 +237,27 @@ def solve_vision(image_base64: str, prompt: str = "This is an educational proble
     raise RuntimeError(f"Vision analysis failed: {last_err}")
 
 
+def generate_flashcards(topic: str, num_cards: int = 10) -> list[dict]:
+    """Generate flashcards for a topic. Returns list of {question, answer} dicts."""
+    messages = [
+        {"role": "system", "content": "You are a flashcard generator. Return ONLY a JSON array of objects with 'question' and 'answer' keys. No markdown, no explanation."},
+        {"role": "user", "content": f"Generate exactly {num_cards} educational flashcards about: {topic}. Each card should test a key concept. Return as JSON array."},
+    ]
+    resp = call_ai(messages, model_hint="deepseek", is_json=True)
+    if resp:
+        try:
+            data = json.loads(resp) if isinstance(resp, str) else resp
+            if isinstance(data, list):
+                return data
+            # Some models wrap in a key
+            for key in ["cards", "flashcards"]:
+                if key in data:
+                    return data[key]
+        except Exception:
+            pass
+    return []
+
+
 def build_chat_messages(
     user_message: str,
     history: list[dict] | None = None,

@@ -197,6 +197,20 @@ export const api = {
       body: JSON.stringify({ image_base64: imageBase64, prompt: prompt || undefined }),
     }),
 
+  // Flashcards
+  generateFlashcards: (topic: string, numCards?: number) =>
+    request<{ cards: { question: string; answer: string }[]; topic: string }>("/api/tools/flashcards", {
+      method: "POST",
+      body: JSON.stringify({ topic, num_cards: numCards || 10 }),
+    }),
+
+  // Chat with image (uses vision endpoint)
+  chatWithImage: (imageBase64: string, message: string) =>
+    request<{ answer: string; model_used: string }>("/api/tools/vision", {
+      method: "POST",
+      body: JSON.stringify({ image_base64: imageBase64, prompt: message }),
+    }),
+
   // Health
   health: () => request<{ status: string }>("/api/health"),
 };
