@@ -121,6 +121,7 @@ class ChatRequest(BaseModel):
 
 
 class ChatResponse(BaseModel):
+    model_config = {"protected_namespaces": ()}
     reply: str
     model_used: str
     emotion_detected: str = ""
@@ -248,6 +249,7 @@ class VisionRequest(BaseModel):
 
 
 class VisionResponse(BaseModel):
+    model_config = {"protected_namespaces": ()}
     answer: str
     model_used: str
 

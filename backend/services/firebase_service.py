@@ -5,6 +5,7 @@ Ported from app.py's Firebase helper functions.
 """
 
 from __future__ import annotations
+import json
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -25,12 +26,22 @@ def init_firebase():
     if _db is not None:
         return _db
 
-    cred_path = settings.FIREBASE_CREDENTIALS_PATH
-    if not os.path.exists(cred_path):
-        raise FileNotFoundError(f"Firebase credentials not found at {cred_path}")
+    cred = None
+    # Option 1: Load from JSON env var (for Render / cloud hosts)
+    cred_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
+    if cred_json:
+        cred = credentials.Certificate(json.loads(cred_json))
+    else:
+        # Option 2: Load from file path
+        cred_path = settings.FIREBASE_CREDENTIALS_PATH
+        if not os.path.exists(cred_path):
+            raise FileNotFoundError(
+                f"Firebase credentials not found. Set FIREBASE_CREDENTIALS_JSON env var "
+                f"or place firebase_credentials.json at {cred_path}"
+            )
+        cred = credentials.Certificate(cred_path)
 
     if not firebase_admin._apps:
-        cred = credentials.Certificate(cred_path)
         app_options = {}
         if settings.FIREBASE_STORAGE_BUCKET:
             app_options["storageBucket"] = settings.FIREBASE_STORAGE_BUCKET
