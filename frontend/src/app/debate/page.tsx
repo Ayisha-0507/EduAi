@@ -13,6 +13,7 @@ import {
 import { useRouter } from "next/navigation";
 import AppLayout from "@/components/layout/AppLayout";
 import { api } from "@/lib/api";
+import { playSendSound } from "@/lib/sfx";
 
 interface Scores {
   logic: number;
@@ -73,6 +74,7 @@ export default function DebatePage() {
   // ── Start Debate ──
   const handleStart = async () => {
     if (!topic.trim() || loading) return;
+    playSendSound();
     setLoading(true);
     setError(null);
     try {
@@ -84,7 +86,11 @@ export default function DebatePage() {
       setLatestAi("");
       setLatestScores(null);
     } catch (e: any) {
-      setError(e.message || "Failed to start debate.");
+      if (e.message?.includes("Not Found")) {
+        setError("Debate service not reachable. Please refresh and try again.");
+      } else {
+        setError(e.message || "Failed to start debate.");
+      }
     } finally {
       setLoading(false);
     }
@@ -93,6 +99,7 @@ export default function DebatePage() {
   // ── Submit Argument ──
   const handleSubmitArgument = async () => {
     if (!userInput.trim() || loading) return;
+    playSendSound();
     setLoading(true);
     setError(null);
     const arg = userInput.trim();
@@ -178,7 +185,7 @@ export default function DebatePage() {
 
   return (
     <AppLayout>
-      <div className="flex-1 flex flex-col items-center justify-start p-6 gap-6 overflow-y-auto">
+      <div className="flex-1 flex flex-col items-center justify-start p-4 md:p-6 gap-4 md:gap-6 overflow-y-auto">
         <div className="w-full max-w-3xl space-y-6">
           {/* Header */}
           <div className="flex items-center gap-3">
@@ -286,12 +293,12 @@ export default function DebatePage() {
           {phase === "debating" && (
             <div className="space-y-4">
               {/* Topic banner */}
-              <div className="glass-card py-3 px-4 flex items-center justify-between">
+              <div className="glass-card py-3 px-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div>
                   <span className="text-xs text-text-secondary">Topic:</span>
                   <p className="text-sm font-medium text-text-primary">{topic}</p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs px-2 py-1 rounded-full bg-accent-green/20 text-accent-green border border-accent-green/30">
                     You: {stance.toUpperCase()}
                   </span>
@@ -331,7 +338,7 @@ export default function DebatePage() {
                   </div>
 
                   {/* Scores */}
-                  <div className="glass-card mx-8 bg-bg-tertiary/50 space-y-2">
+                  <div className="glass-card mx-1 sm:mx-8 bg-bg-tertiary/50 space-y-2">
                     <p className="text-xs font-medium text-amber-400 flex items-center gap-1">
                       <FiAward size={12} /> Round {round.round} Scores
                     </p>

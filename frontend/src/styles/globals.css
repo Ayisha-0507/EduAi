@@ -182,6 +182,35 @@ body {
   .text-sm {
     font-size: 0.9rem !important;
   }
+
+  /* Hide scrollbars on mobile for cleaner look */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  /* Ensure images don't overflow on mobile */
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Markdown content adjustments for mobile */
+  .markdown-body pre {
+    padding: 12px;
+    font-size: 0.85em;
+  }
+  .markdown-body code {
+    font-size: 0.85em;
+    word-break: break-word;
+  }
+
+  /* Prevent horizontal overflow */
+  .prose pre,
+  .markdown-body pre {
+    max-width: calc(100vw - 3rem);
+    overflow-x: auto;
+  }
 }
 
 /* ── Boot Animation ─────────────────────────────────────────────── */

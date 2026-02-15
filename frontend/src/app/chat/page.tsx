@@ -7,6 +7,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useAuthStore, ChatMessage } from "@/lib/store";
 import { api } from "@/lib/api";
+import { playSendSound } from "@/lib/sfx";
 import AppLayout from "@/components/layout/AppLayout";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -139,6 +140,8 @@ export default function ChatPage() {
   const handleSend = async () => {
     if ((!input.trim() && !attachedImage) || loading) return;
 
+    playSendSound();
+
     // Capture input before clearing
     const msg = input.trim();
     const hasImage = !!attachedImage;
@@ -246,7 +249,7 @@ export default function ChatPage() {
         {/* Main chat area */}
         <div className="flex flex-col flex-1 min-w-0">
           {/* Header */}
-          <header className="px-6 py-3 border-b border-border-default bg-bg-secondary/50 flex items-center gap-3">
+          <header className="px-3 md:px-6 py-3 border-b border-border-default bg-bg-secondary/50 flex items-center gap-3">
             <button
               onClick={() => setShowDatePanel(!showDatePanel)}
               className="p-2 rounded-md hover:bg-bg-tertiary text-text-secondary transition"
@@ -279,7 +282,7 @@ export default function ChatPage() {
           </header>
 
           {/* Controls Bar */}
-          <div className="px-6 py-2 border-b border-border-default flex flex-wrap items-center gap-2">
+          <div className="px-3 md:px-6 py-2 border-b border-border-default flex flex-wrap items-center gap-2">
             <div className="flex gap-1">
               {STYLE_BUTTONS.map((s) => (
                 <button
@@ -310,7 +313,7 @@ export default function ChatPage() {
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          <div className="flex-1 overflow-y-auto px-3 md:px-6 py-4 space-y-4">
             {messages.length === 0 && (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center">
@@ -404,7 +407,7 @@ export default function ChatPage() {
           </div>
 
           {/* Input */}
-          <div className="px-6 py-3 border-t border-border-default bg-bg-secondary/50">
+          <div className="px-3 md:px-6 py-3 border-t border-border-default bg-bg-secondary/50">
             {/* Image preview strip */}
             {attachedPreview && (
               <div className="max-w-4xl mx-auto mb-2 flex items-center gap-2">

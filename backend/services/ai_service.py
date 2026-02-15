@@ -236,8 +236,12 @@ def _strip_system_messages(messages: list[dict]) -> list[dict]:
 def solve_vision(image_base64: str, prompt: str = "This is an educational problem. Solve it step-by-step and provide a clear explanation.") -> tuple[str, str]:
     """Send an image to a vision model for analysis."""
     client = get_client()
-    # Try nemotron VL first, then qwen_vl
-    vision_models = [settings.AI_MODELS["nemotron"], settings.AI_MODELS["qwen_vl"]]
+    # Try multiple vision-capable models in order
+    vision_models = [
+        settings.AI_MODELS["qwen_vl"],
+        settings.AI_MODELS["nemotron"],
+        settings.AI_MODELS.get("gemma_vl", "google/gemma-3-27b-it:free"),
+    ]
     messages = [{
         "role": "user",
         "content": [

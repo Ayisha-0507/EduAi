@@ -6,26 +6,9 @@
  */
 
 import { useRouter } from "next/navigation";
-import { FiArrowLeft, FiGithub, FiHeart, FiZap, FiBook, FiCamera, FiMessageSquare, FiCpu, FiLayers } from "react-icons/fi";
+import { FiArrowLeft, FiHeart } from "react-icons/fi";
 import AppLayout from "@/components/layout/AppLayout";
 import ParticleField from "@/components/effects/ParticleField";
-
-const FEATURES = [
-  { icon: FiMessageSquare, title: "AI Chat", desc: "Conversational tutoring with emotion detection and multiple response styles" },
-  { icon: FiCamera, title: "Vision Solver", desc: "Snap a photo of any problem — AI reads and solves it instantly" },
-  { icon: FiLayers, title: "Flashcards", desc: "AI-generated study cards from any topic for quick revision" },
-  { icon: FiZap, title: "Debate Arena", desc: "Argue against AI — get scored on logic, evidence & persuasion" },
-  { icon: FiBook, title: "Learning Paths", desc: "Structured, multi-step learning journeys with progress tracking" },
-  { icon: FiCpu, title: "Feynman Board", desc: "Teach concepts back to AI to test your understanding" },
-];
-
-const TECH_STACK = [
-  { label: "Frontend", items: "Next.js 14, React 18, TypeScript, Tailwind CSS" },
-  { label: "Backend", items: "FastAPI, Python 3.11, Gunicorn + Uvicorn" },
-  { label: "AI", items: "OpenRouter (DeepSeek, Llama, Mistral, Nemotron, Qwen)" },
-  { label: "Auth & DB", items: "Firebase Authentication & Firestore" },
-  { label: "Hosting", items: "GitHub Pages (Frontend) + Render (Backend)" },
-];
 
 export default function AboutPage() {
   const router = useRouter();
@@ -36,7 +19,7 @@ export default function AboutPage() {
         {/* Particle background */}
         <ParticleField count={35} className="!fixed" />
 
-        <div className="relative z-10 p-6 max-w-3xl mx-auto space-y-8">
+        <div className="relative z-10 p-4 md:p-6 max-w-3xl mx-auto space-y-6">
           {/* Header */}
           <div className="flex items-center gap-3">
             <button
@@ -46,7 +29,7 @@ export default function AboutPage() {
               <FiArrowLeft size={20} />
             </button>
             <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-accent-green via-accent-blue to-purple-400 bg-clip-text text-transparent">
+              <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-accent-green via-accent-blue to-purple-400 bg-clip-text text-transparent">
                 About EduAI
               </h1>
               <p className="text-text-secondary text-sm mt-0.5">Your Personal AI-Powered Tutor</p>
@@ -67,46 +50,6 @@ export default function AboutPage() {
                 and helps you master any subject through conversation, quizzes, flashcards,
                 and even live debates.
               </p>
-            </div>
-          </div>
-
-          {/* Features grid */}
-          <div>
-            <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-3">
-              ✨ Features
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {FEATURES.map((f) => (
-                <div
-                  key={f.title}
-                  className="glass-card flex items-start gap-3 py-3 px-4 hover:border-accent-green/30 transition group"
-                >
-                  <div className="w-9 h-9 rounded-lg bg-accent-green/10 border border-accent-green/20 flex items-center justify-center flex-shrink-0 group-hover:bg-accent-green/20 transition">
-                    <f.icon size={16} className="text-accent-green" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-text-primary">{f.title}</p>
-                    <p className="text-xs text-text-secondary leading-relaxed">{f.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Tech stack */}
-          <div className="glass-card space-y-3">
-            <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wider">
-              🛠 Tech Stack
-            </h2>
-            <div className="space-y-2">
-              {TECH_STACK.map((t) => (
-                <div key={t.label} className="flex items-start gap-2">
-                  <span className="text-xs font-medium text-accent-blue w-20 flex-shrink-0 pt-0.5">
-                    {t.label}
-                  </span>
-                  <span className="text-xs text-text-secondary">{t.items}</span>
-                </div>
-              ))}
             </div>
           </div>
 

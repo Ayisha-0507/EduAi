@@ -63,7 +63,7 @@ export default function FlashcardsPage() {
 
   return (
     <AppLayout>
-      <div className="flex-1 flex flex-col items-center justify-start p-6 gap-6 overflow-y-auto">
+      <div className="flex-1 flex flex-col items-center justify-start p-4 md:p-6 gap-4 md:gap-6 overflow-y-auto">
         <div className="w-full max-w-2xl space-y-6">
           {/* Header */}
           <div className="flex items-center gap-3">

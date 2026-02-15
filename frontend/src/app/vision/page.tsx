@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { api } from "@/lib/api";
+import AppLayout from "@/components/layout/AppLayout";
 
 export default function VisionPage() {
   const router = useRouter();
@@ -19,6 +20,7 @@ export default function VisionPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
+  const [videoReady, setVideoReady] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -33,7 +35,6 @@ export default function VisionPage() {
     reader.onload = () => {
       const dataUrl = reader.result as string;
       setPreview(dataUrl);
-      // Extract base64 without data:...;base64, prefix
       const base64 = dataUrl.split(",")[1];
       setImageData(base64);
       setAnswer(null);
@@ -46,13 +47,20 @@ export default function VisionPage() {
   const startCamera = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
+        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
       });
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play();
+        };
+        videoRef.current.onplaying = () => {
+          setVideoReady(true);
+        };
       }
       setCameraActive(true);
+      setVideoReady(false);
     } catch {
       setError("Camera access denied or not available.");
     }
@@ -62,16 +70,22 @@ export default function VisionPage() {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     setCameraActive(false);
+    setVideoReady(false);
   }, []);
 
   const capturePhoto = useCallback(() => {
     if (!videoRef.current || !canvasRef.current) return;
     const video = videoRef.current;
+    // Guard: ensure video has valid dimensions before capture
+    if (video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) {
+      setError("Camera is still loading. Please wait a moment and try again.");
+      return;
+    }
     const canvas = canvasRef.current;
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext("2d");
-    ctx?.drawImage(video, 0, 0);
+    ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
     const dataUrl = canvas.toDataURL("image/png");
     setPreview(dataUrl);
     setImageData(dataUrl.split(",")[1]);
@@ -108,159 +122,163 @@ export default function VisionPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => router.back()}
-          className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white transition-colors border border-gray-700"
-          title="Go back"
-        >
-          <FiArrowLeft size={20} />
-        </button>
-        <div>
-          <h1 className="text-2xl font-bold text-white mb-1">
-            Live Vision Solver
-          </h1>
-          <p className="text-gray-400">
-            Snap a photo or upload an image of a math problem, diagram, or code
-            snippet. The AI will analyze and solve it!
-          </p>
-        </div>
-      </div>
-
-      {/* Image Input Area */}
-      <div className="bg-gray-800 rounded-xl border border-gray-700 p-6 space-y-4">
-        {!preview && !cameraActive && (
-          <div className="flex flex-col items-center gap-4">
-            <div className="flex gap-4">
-              <button
-                onClick={startCamera}
-                className="flex items-center gap-2 px-6 py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg transition-colors"
-              >
-                <FiCamera size={20} /> Use Camera
-              </button>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors"
-              >
-                <FiUpload size={20} /> Upload Image
-              </button>
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleFileUpload}
-            />
-            <p className="text-gray-500 text-sm">
-              Supports JPG, PNG, WebP. Max recommended: 4MB.
+    <AppLayout>
+      <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-5">
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => router.back()}
+            className="p-2 rounded-lg bg-bg-tertiary hover:bg-border-default text-text-secondary hover:text-text-primary transition border border-border-default"
+            title="Go back"
+          >
+            <FiArrowLeft size={20} />
+          </button>
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold text-text-primary">
+              Live Vision Solver
+            </h1>
+            <p className="text-text-secondary text-sm">
+              Snap a photo or upload an image of a problem. AI will analyze and solve it!
             </p>
           </div>
-        )}
+        </div>
 
-        {/* Camera View */}
-        {cameraActive && (
-          <div className="space-y-3">
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              className="w-full max-h-[400px] rounded-lg object-contain bg-black"
-            />
-            <div className="flex gap-3 justify-center">
-              <button
-                onClick={capturePhoto}
-                className="px-6 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors"
-              >
-                Capture
-              </button>
-              <button
-                onClick={stopCamera}
-                className="px-6 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Preview */}
-        {preview && (
-          <div className="space-y-3">
-            <div className="relative inline-block">
-              <img
-                src={preview}
-                alt="Captured"
-                className="max-h-[350px] rounded-lg border border-gray-600"
+        {/* Image Input Area */}
+        <div className="glass-card space-y-4">
+          {!preview && !cameraActive && (
+            <div className="flex flex-col items-center gap-4">
+              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                <button
+                  onClick={startCamera}
+                  className="flex items-center justify-center gap-2 px-6 py-3 bg-accent-blue hover:bg-accent-blue/80 text-white rounded-lg transition-colors w-full sm:w-auto"
+                >
+                  <FiCamera size={20} /> Use Camera
+                </button>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center justify-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors w-full sm:w-auto"
+                >
+                  <FiUpload size={20} /> Upload Image
+                </button>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={handleFileUpload}
               />
-              <button
-                onClick={clearImage}
-                className="absolute top-2 right-2 p-1 bg-red-600 hover:bg-red-500 rounded-full text-white"
-              >
-                <FiX size={16} />
-              </button>
+              <p className="text-text-secondary text-sm text-center">
+                Supports JPG, PNG, WebP. Max recommended: 4MB.
+              </p>
             </div>
+          )}
+
+          {/* Camera View */}
+          {cameraActive && (
+            <div className="space-y-3">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full max-h-[60vh] rounded-lg object-contain bg-black"
+              />
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={capturePhoto}
+                  disabled={!videoReady}
+                  className="px-6 py-2 bg-accent-green hover:bg-accent-greenHover text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {videoReady ? "Capture" : "Loading..."}
+                </button>
+                <button
+                  onClick={stopCamera}
+                  className="px-6 py-2 bg-bg-tertiary hover:bg-border-default text-text-primary rounded-lg transition-colors border border-border-default"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Preview */}
+          {preview && (
+            <div className="space-y-3">
+              <div className="relative inline-block w-full">
+                <img
+                  src={preview}
+                  alt="Captured"
+                  className="max-h-[50vh] w-auto rounded-lg border border-border-default mx-auto block"
+                />
+                <button
+                  onClick={clearImage}
+                  className="absolute top-2 right-2 p-1.5 bg-red-600 hover:bg-red-500 rounded-full text-white"
+                >
+                  <FiX size={16} />
+                </button>
+              </div>
+            </div>
+          )}
+
+          <canvas ref={canvasRef} className="hidden" />
+        </div>
+
+        {/* Prompt & Solve */}
+        {imageData && (
+          <div className="glass-card space-y-4">
+            <label className="text-sm text-text-secondary font-medium">
+              Prompt (optional — customize what the AI should do)
+            </label>
+            <textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              rows={2}
+              className="w-full px-4 py-2 bg-bg-primary border border-border-default rounded-lg text-text-primary resize-none focus:outline-none focus:border-accent-blue transition"
+            />
+            <button
+              onClick={handleSolve}
+              disabled={loading}
+              className="w-full py-3 bg-gradient-to-r from-accent-blue to-purple-600 hover:from-accent-blue/80 hover:to-purple-500 text-white font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <FiLoader className="animate-spin" size={18} /> Analyzing...
+                </>
+              ) : (
+                "Solve & Explain"
+              )}
+            </button>
           </div>
         )}
 
-        <canvas ref={canvasRef} className="hidden" />
+        {/* Error */}
+        {error && (
+          <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 text-red-300 text-sm">
+            {error}
+          </div>
+        )}
+
+        {/* Result */}
+        {answer && (
+          <div className="glass-card space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <h2 className="text-lg font-semibold text-text-primary">Solution</h2>
+              {modelUsed && (
+                <span className="text-xs bg-bg-tertiary px-2 py-1 rounded text-text-secondary border border-border-default">
+                  {modelUsed.split("/").pop()}
+                </span>
+              )}
+            </div>
+            <div className="markdown-body">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {answer}
+              </ReactMarkdown>
+            </div>
+          </div>
+        )}
       </div>
-
-      {/* Prompt & Solve */}
-      {imageData && (
-        <div className="bg-gray-800 rounded-xl border border-gray-700 p-6 space-y-4">
-          <label className="text-sm text-gray-300 font-medium">
-            Prompt (optional — customize what the AI should do)
-          </label>
-          <textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            rows={2}
-            className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg text-white resize-none focus:outline-none focus:border-cyan-500"
-          />
-          <button
-            onClick={handleSolve}
-            disabled={loading}
-            className="w-full py-3 bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 text-white font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {loading ? (
-              <>
-                <FiLoader className="animate-spin" size={18} /> Analyzing...
-              </>
-            ) : (
-              "Solve & Explain"
-            )}
-          </button>
-        </div>
-      )}
-
-      {/* Error */}
-      {error && (
-        <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 text-red-300">
-          {error}
-        </div>
-      )}
-
-      {/* Result */}
-      {answer && (
-        <div className="bg-gray-800 rounded-xl border border-gray-700 p-6 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">Solution</h2>
-            {modelUsed && (
-              <span className="text-xs bg-gray-700 px-2 py-1 rounded text-gray-400">
-                {modelUsed.split("/").pop()}
-              </span>
-            )}
-          </div>
-          <div className="prose prose-invert max-w-none text-gray-200">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {answer}
-            </ReactMarkdown>
-          </div>
-        </div>
-      )}
-    </div>
+    </AppLayout>
   );
 }

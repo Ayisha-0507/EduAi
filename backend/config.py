@@ -22,7 +22,8 @@ class Settings:
         "nous":        "mistralai/mistral-small-3.1-24b-instruct:free",
         "blackforest": "black-forest-labs/flux.2-klein-4b",
         "nemotron":    "nvidia/nemotron-nano-12b-v2-vl:free",
-        "qwen_vl":     "qwen/qwen3-vl-30b-a3b-thinking:free",
+        "qwen_vl":     "qwen/qwen2.5-vl-72b-instruct:free",
+        "gemma_vl":    "google/gemma-3-27b-it:free",
     }
 
     # Fallback models if primary fails (tried in order)

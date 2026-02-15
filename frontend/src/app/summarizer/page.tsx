@@ -64,7 +64,7 @@ export default function SummarizerPage() {
 
   return (
     <AppLayout>
-      <div className="p-6 max-w-4xl mx-auto space-y-6">
+      <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6">
         <h1 className="text-xl font-bold">📄 Textbook Summarizer</h1>
         <p className="text-sm text-text-secondary">
           Paste a chapter or upload a text file. The AI will extract key

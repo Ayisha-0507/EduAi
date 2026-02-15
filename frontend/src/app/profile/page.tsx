@@ -59,7 +59,7 @@ export default function ProfilePage() {
 
   return (
     <AppLayout>
-      <div className="p-6 max-w-3xl mx-auto space-y-6 overflow-y-auto flex-1">
+      <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-6 overflow-y-auto flex-1">
         {/* Header */}
         <div className="flex items-center gap-3">
           <button

@@ -11,6 +11,9 @@ import { FiArrowLeft, FiSend, FiWifiOff } from "react-icons/fi";
 import { useRouter } from "next/navigation";
 import AppLayout from "@/components/layout/AppLayout";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { playSendSound } from "@/lib/sfx";
+
 
 interface OfflineMessage {
   role: "user" | "assistant";
@@ -154,6 +157,7 @@ export default function OfflineChatPage() {
 
   const handleSend = () => {
     if (!input.trim()) return;
+    playSendSound();
     const userMsg: OfflineMessage = {
       role: "user",
       content: input.trim(),
@@ -173,7 +177,7 @@ export default function OfflineChatPage() {
     <AppLayout>
       <div className="flex-1 flex flex-col h-screen">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-border-default bg-bg-secondary/50 flex items-center gap-3">
+        <div className="px-3 md:px-6 py-4 border-b border-border-default bg-bg-secondary/50 flex items-center gap-3">
           <button
             onClick={() => router.back()}
             className="p-2 rounded-lg bg-bg-tertiary hover:bg-border-default text-text-secondary hover:text-text-primary transition border border-border-default"
@@ -192,11 +196,11 @@ export default function OfflineChatPage() {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+        <div className="flex-1 overflow-y-auto px-3 md:px-6 py-4 space-y-4">
           {messages.map((msg, idx) => (
             <div key={idx} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
               <div
-                className={`max-w-[80%] rounded-xl px-4 py-3 text-sm leading-relaxed ${
+                className={`max-w-[95%] sm:max-w-[80%] rounded-xl px-3 md:px-4 py-3 text-sm leading-relaxed ${
                   msg.role === "user"
                     ? "bg-accent-green/15 border border-accent-green/25 text-text-primary"
                     : "bg-bg-tertiary/80 border border-border-default text-text-primary"
@@ -222,7 +226,7 @@ export default function OfflineChatPage() {
         </div>
 
         {/* Input */}
-        <div className="px-6 py-3 border-t border-border-default bg-bg-secondary/50">
+        <div className="px-3 md:px-6 py-3 border-t border-border-default bg-bg-secondary/50">
           <div className="flex gap-2 max-w-4xl mx-auto">
             <input
               type="text"

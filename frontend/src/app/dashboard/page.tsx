@@ -104,7 +104,7 @@ export default function DashboardPage() {
 
   return (
     <AppLayout>
-      <div className="p-6 max-w-6xl mx-auto space-y-6">
+      <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-6">
         <h1 className="text-xl font-bold">Dashboard</h1>
 
         {/* Stats Cards */}

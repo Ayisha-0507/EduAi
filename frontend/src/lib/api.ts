@@ -3,7 +3,11 @@
  * Typed fetch wrapper for all backend endpoints.
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Prefer env override; fall back to production Render URL to avoid 404s on GitHub Pages
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ||
+  "https://eduai-backend.onrender.com" ||
+  "http://localhost:8000";
 
 // ── Helper ────────────────────────────────────────────────────────────────────
 

@@ -96,7 +96,7 @@ export default function CareerPage() {
 
   return (
     <AppLayout>
-      <div className="p-6 max-w-4xl mx-auto space-y-6">
+      <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6">
         <h1 className="text-xl font-bold">💼 Career Path Finder</h1>
         <p className="text-sm text-text-secondary">
           Answer a few questions about your skills and interests. The AI will

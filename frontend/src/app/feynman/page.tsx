@@ -66,7 +66,7 @@ export default function FeynmanPage() {
     <AppLayout>
       <div className="flex flex-col h-screen">
         {/* Header */}
-        <header className="px-6 py-4 border-b border-border-default bg-bg-secondary/50">
+        <header className="px-3 md:px-6 py-4 border-b border-border-default bg-bg-secondary/50">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-lg font-semibold">🎓 Feynman Board</h1>
@@ -86,7 +86,7 @@ export default function FeynmanPage() {
         </header>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+        <div className="flex-1 overflow-y-auto px-3 md:px-6 py-4 space-y-4">
           {messages.length === 0 && (
             <div className="flex items-center justify-center h-full">
               <div className="text-center max-w-md">
@@ -147,7 +147,7 @@ export default function FeynmanPage() {
         </div>
 
         {/* Input */}
-        <div className="px-6 py-4 border-t border-border-default">
+        <div className="px-3 md:px-6 py-4 border-t border-border-default">
           <div className="flex gap-3 max-w-4xl mx-auto">
             <input
               value={input}

@@ -20,6 +20,8 @@ import {
   FiCpu,
   FiBook,
   FiHelpCircle,
+  FiMenu,
+  FiX,
 } from "react-icons/fi";
 
 interface PathData {
@@ -41,6 +43,7 @@ export default function LearnPage() {
   const [newName, setNewName] = useState("");
   const [newGoal, setNewGoal] = useState("");
   const [createMethod, setCreateMethod] = useState<"manual" | "ai_generated">("manual");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Load paths
@@ -107,12 +110,11 @@ export default function LearnPage() {
     if (!input.trim() || chatLoading || !token || !activePath) return;
     setChatLoading(true);
     try {
-      const res = await api.sendMessage(token, {
+      await api.sendMessage(token, {
         message: input,
         path_name: activePath,
         topic: activeData?.current_topic,
       });
-      // Refresh paths to get updated chat history
       const pathsRes = await api.listPaths(token);
       setPaths(pathsRes.paths);
       setInput("");
@@ -123,13 +125,59 @@ export default function LearnPage() {
     }
   };
 
+  const selectPath = (name: string) => {
+    setActivePath(name);
+    setSidebarOpen(false); // close on mobile after selection
+  };
+
+  // Guest users cannot use learning paths
+  if (isGuest && !token) {
+    return (
+      <AppLayout>
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div className="text-center max-w-sm">
+            <FiBook className="mx-auto text-text-secondary mb-4" size={40} />
+            <h2 className="text-lg font-semibold text-text-primary">Sign In Required</h2>
+            <p className="text-sm text-text-secondary mt-2">
+              Learning paths require an account to save your progress. Please sign in to use this feature.
+            </p>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout>
-      <div className="flex h-screen">
+      <div className="flex h-full min-h-0 relative">
+        {/* Mobile sidebar toggle */}
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="md:hidden fixed top-3 right-3 z-50 p-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary shadow-lg"
+        >
+          {sidebarOpen ? <FiX size={20} /> : <FiMenu size={20} />}
+        </button>
+
+        {/* Mobile overlay */}
+        {sidebarOpen && (
+          <div
+            className="md:hidden fixed inset-0 bg-black/50 z-30"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
         {/* Path List Sidebar */}
-        <div className="w-72 border-r border-border-default bg-bg-secondary flex flex-col">
+        <div
+          className={`
+            fixed md:static inset-y-0 left-0 z-40
+            w-72 md:w-64 lg:w-72
+            border-r border-border-default bg-bg-secondary flex flex-col
+            transform transition-transform duration-200 ease-in-out
+            ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
+          `}
+        >
           <div className="p-4 border-b border-border-default flex items-center justify-between">
-            <h2 className="font-semibold text-sm">Learning Paths</h2>
+            <h2 className="font-semibold text-sm text-text-primary">Learning Paths</h2>
             <button
               onClick={() => setShowCreate(!showCreate)}
               className="p-1.5 rounded-md hover:bg-bg-tertiary text-text-secondary hover:text-accent-green transition"
@@ -203,7 +251,7 @@ export default function LearnPage() {
                   }`}
                 >
                   <button
-                    onClick={() => setActivePath(name)}
+                    onClick={() => selectPath(name)}
                     className="flex-1 text-left px-3 py-2.5"
                   >
                     <p className="text-sm font-medium text-text-primary truncate">
@@ -227,19 +275,19 @@ export default function LearnPage() {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-w-0">
           {activeData ? (
             <>
               {/* Topic Bar */}
-              <div className="px-6 py-3 border-b border-border-default bg-bg-secondary/50 flex items-center gap-3">
+              <div className="px-4 md:px-6 py-3 border-b border-border-default bg-bg-secondary/50 flex items-center gap-2 md:gap-3">
                 <button
                   onClick={() => handleTopicNav(-1)}
-                  className="p-1.5 rounded-md hover:bg-bg-tertiary text-text-secondary transition"
+                  className="p-1.5 rounded-md hover:bg-bg-tertiary text-text-secondary transition flex-shrink-0"
                 >
                   <FiChevronLeft size={18} />
                 </button>
-                <div className="flex-1 text-center">
-                  <p className="text-sm font-medium">
+                <div className="flex-1 text-center min-w-0">
+                  <p className="text-sm font-medium truncate">
                     {activeData.current_topic || "Getting Started"}
                   </p>
                   <p className="text-xs text-text-secondary">
@@ -250,19 +298,19 @@ export default function LearnPage() {
                 </div>
                 <button
                   onClick={() => handleTopicNav(1)}
-                  className="p-1.5 rounded-md hover:bg-bg-tertiary text-text-secondary transition"
+                  className="p-1.5 rounded-md hover:bg-bg-tertiary text-text-secondary transition flex-shrink-0"
                 >
                   <FiChevronRight size={18} />
                 </button>
               </div>
 
               {/* Topics Breadcrumb */}
-              <div className="px-6 py-2 border-b border-border-default overflow-x-auto flex gap-2">
+              <div className="px-4 md:px-6 py-2 border-b border-border-default overflow-x-auto flex gap-2 scrollbar-thin">
                 {activeData.topics.map((t, i) => (
                   <button
                     key={i}
                     onClick={() => token && api.setTopic(token, activePath!, t).then(() => api.listPaths(token).then(r => setPaths(r.paths)))}
-                    className={`whitespace-nowrap px-3 py-1 rounded-full text-xs transition ${
+                    className={`whitespace-nowrap px-3 py-1 rounded-full text-xs transition flex-shrink-0 ${
                       t === activeData.current_topic
                         ? "bg-accent-green/15 text-accent-green border border-accent-green/30"
                         : "text-text-secondary hover:text-text-primary hover:bg-bg-tertiary"
@@ -274,7 +322,7 @@ export default function LearnPage() {
               </div>
 
               {/* Chat */}
-              <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+              <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 space-y-4">
                 {activeData.chat_history.map((msg, i) => (
                   <div
                     key={i}
@@ -307,19 +355,19 @@ export default function LearnPage() {
               </div>
 
               {/* Input */}
-              <div className="px-6 py-4 border-t border-border-default">
-                <div className="flex gap-3">
+              <div className="px-4 md:px-6 py-3 md:py-4 border-t border-border-default">
+                <div className="flex gap-2 md:gap-3">
                   <input
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleSend()}
                     placeholder={`Ask about ${activeData.current_topic}...`}
-                    className="flex-1 bg-bg-primary border border-border-default rounded-lg px-4 py-3 text-text-primary placeholder-text-secondary/50 focus:border-accent-blue outline-none transition"
+                    className="flex-1 bg-bg-primary border border-border-default rounded-lg px-3 md:px-4 py-2.5 md:py-3 text-text-primary placeholder-text-secondary/50 focus:border-accent-blue outline-none transition text-sm"
                   />
                   <button
                     onClick={handleSend}
                     disabled={chatLoading || !input.trim()}
-                    className="px-4 py-3 bg-accent-green hover:bg-accent-greenHover text-white rounded-lg transition disabled:opacity-50"
+                    className="px-3 md:px-4 py-2.5 md:py-3 bg-accent-green hover:bg-accent-greenHover text-white rounded-lg transition disabled:opacity-50 flex-shrink-0"
                   >
                     <FiSend size={18} />
                   </button>
@@ -327,13 +375,19 @@ export default function LearnPage() {
               </div>
             </>
           ) : (
-            <div className="flex-1 flex items-center justify-center">
+            <div className="flex-1 flex items-center justify-center p-6">
               <div className="text-center">
                 <FiBook className="mx-auto text-text-secondary mb-4" size={40} />
-                <h2 className="text-lg font-semibold">Select a Learning Path</h2>
+                <h2 className="text-lg font-semibold text-text-primary">Select a Learning Path</h2>
                 <p className="text-sm text-text-secondary mt-1">
                   Choose a path from the sidebar or create a new one
                 </p>
+                <button
+                  onClick={() => setSidebarOpen(true)}
+                  className="mt-4 md:hidden px-4 py-2 bg-accent-green text-white rounded-lg text-sm hover:bg-accent-greenHover transition"
+                >
+                  Open Paths
+                </button>
               </div>
             </div>
           )}
