@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/lib/store";
 import LoginForm from "@/components/auth/LoginForm";
+import ParticleField from "@/components/effects/ParticleField";
 
 export default function HomePage() {
   const { isLoggedIn, isGuest } = useAuthStore();
@@ -25,6 +26,9 @@ export default function HomePage() {
 
   return (
     <>
+      {/* Interactive particle background — follows cursor/touch */}
+      <ParticleField count={50} />
+
       {/* Boot animation overlay – original Streamlit cyber-brain */}
       {phase !== "login" && (
         <div

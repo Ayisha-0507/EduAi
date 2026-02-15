@@ -184,6 +184,9 @@ def call_ai(
                 # Some models don't support system messages — merge into user
                 if "gemma" in fb_model:
                     fb_kwargs["messages"] = _strip_system_messages(messages)
+                # Some free models don't support response_format — remove it to avoid errors
+                if "response_format" in fb_kwargs:
+                    fb_kwargs.pop("response_format", None)
                 resp = client.chat.completions.create(**fb_kwargs)
                 return resp.choices[0].message.content
             except Exception as fb_err:
@@ -240,17 +243,27 @@ def solve_vision(image_base64: str, prompt: str = "This is an educational proble
 def generate_flashcards(topic: str, num_cards: int = 10) -> list[dict]:
     """Generate flashcards for a topic. Returns list of {question, answer} dicts."""
     messages = [
-        {"role": "system", "content": "You are a flashcard generator. Return ONLY a JSON array of objects with 'question' and 'answer' keys. No markdown, no explanation."},
+        {"role": "system", "content": "You are a flashcard generator. Return ONLY a JSON array of objects with 'question' and 'answer' keys. No markdown, no explanation, no code fences."},
         {"role": "user", "content": f"Generate exactly {num_cards} educational flashcards about: {topic}. Each card should test a key concept. Return as JSON array."},
     ]
     resp = call_ai(messages, model_hint="deepseek", is_json=True)
+    if not resp:
+        # Retry without JSON mode in case model doesn't support it
+        resp = call_ai(messages, model_hint="deepseek", is_json=False)
     if resp:
         try:
-            data = json.loads(resp) if isinstance(resp, str) else resp
+            # Strip markdown code fences if present
+            cleaned = resp.strip()
+            if cleaned.startswith("```"):
+                cleaned = cleaned.split("\n", 1)[-1]  # remove first line
+                if cleaned.endswith("```"):
+                    cleaned = cleaned[:-3]
+                cleaned = cleaned.strip()
+            data = json.loads(cleaned) if isinstance(cleaned, str) else cleaned
             if isinstance(data, list):
                 return data
             # Some models wrap in a key
-            for key in ["cards", "flashcards"]:
+            for key in ["cards", "flashcards", "data"]:
                 if key in data:
                     return data[key]
         except Exception:
@@ -432,3 +445,193 @@ def generate_feynman_response(user_message: str, history: list[dict]) -> str:
         messages.append({"role": msg["role"], "content": msg["content"]})
     messages.append({"role": "user", "content": user_message})
     return call_ai(messages, model_hint="nous") or ""
+
+
+# ── Debate Arena ─────────────────────────────────────────────────────────────
+
+def _clean_json_response(text: str) -> str:
+    """Strip markdown fences and whitespace from AI JSON responses."""
+    cleaned = text.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.split("\n", 1)[-1]
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3]
+        cleaned = cleaned.strip()
+    return cleaned
+
+
+def debate_round(
+    topic: str,
+    user_stance: str,
+    round_number: int,
+    total_rounds: int,
+    user_argument: str | None,
+    history: list[dict],
+) -> dict:
+    """
+    Process one debate round. If round_number == 0 and no user_argument,
+    return the AI's opening statement. Otherwise score user's argument
+    and return AI's counter-argument.
+    """
+    ai_stance = "against" if user_stance.lower() == "for" else "for"
+    is_opening = round_number == 0 and not user_argument
+    is_final = round_number >= total_rounds
+
+    if is_opening:
+        # AI opening argument — no scoring
+        system = (
+            f"You are in a formal debate about: '{topic}'. "
+            f"You argue {ai_stance.upper()} this topic. "
+            f"Give a strong opening argument (3-5 sentences). "
+            f"Be persuasive, cite reasoning, and set up your position. "
+            f"Return ONLY a JSON object with key 'ai_argument'. No markdown."
+        )
+        messages = [
+            {"role": "system", "content": system},
+            {"role": "user", "content": f"Begin your opening argument {ai_stance} the topic: {topic}"},
+        ]
+        resp = call_ai(messages, model_hint="deepseek", is_json=True)
+        if not resp:
+            resp = call_ai(messages, model_hint="deepseek", is_json=False)
+
+        ai_arg = topic  # fallback
+        if resp:
+            try:
+                data = json.loads(_clean_json_response(resp))
+                ai_arg = data.get("ai_argument", resp)
+            except Exception:
+                ai_arg = resp
+
+        return {
+            "ai_argument": ai_arg,
+            "scores": {"logic": 0, "evidence": 0, "persuasion": 0, "fallacies": [], "feedback": "Opening round — no scores yet."},
+            "round_number": 0,
+            "is_final": False,
+        }
+
+    # Regular round — score user argument + counter
+    history_text = ""
+    for h in history:
+        history_text += f"\n[Round {h.get('round', '?')}]\n"
+        if h.get("user"):
+            history_text += f"Student ({user_stance}): {h['user']}\n"
+        if h.get("ai"):
+            history_text += f"AI ({ai_stance}): {h['ai']}\n"
+
+    system = (
+        f"You are a debate judge AND participant in a formal debate about: '{topic}'.\n"
+        f"The student argues {user_stance.upper()}. You argue {ai_stance.upper()}.\n"
+        f"This is round {round_number} of {total_rounds}.\n\n"
+        f"Your task:\n"
+        f"1. Score the student's latest argument on three criteria (1-10 each):\n"
+        f"   - logic: How logically sound is the reasoning?\n"
+        f"   - evidence: How well-supported with facts/examples?\n"
+        f"   - persuasion: How convincing and well-structured?\n"
+        f"2. Identify any logical fallacies (empty list if none).\n"
+        f"3. Give brief feedback (1-2 sentences) on what was strong/weak.\n"
+        f"4. Present YOUR counter-argument (3-5 sentences), arguing {ai_stance}.\n\n"
+        f"Return ONLY a JSON object with these exact keys:\n"
+        f'{{"ai_argument": "...", "logic": N, "evidence": N, "persuasion": N, '
+        f'"fallacies": ["...", ...], "feedback": "..."}}\n'
+        f"No markdown code fences. Just raw JSON."
+    )
+
+    messages = [{"role": "system", "content": system}]
+    if history_text:
+        messages.append({"role": "assistant", "content": f"Previous rounds:{history_text}"})
+    messages.append({"role": "user", "content": f"Student's argument ({user_stance}): {user_argument}"})
+
+    resp = call_ai(messages, model_hint="deepseek", is_json=True)
+    if not resp:
+        resp = call_ai(messages, model_hint="deepseek", is_json=False)
+
+    # Parse response
+    result = {
+        "ai_argument": "I concede this point. Please continue.",
+        "scores": {"logic": 5, "evidence": 5, "persuasion": 5, "fallacies": [], "feedback": "Score unavailable."},
+        "round_number": round_number,
+        "is_final": is_final,
+    }
+
+    if resp:
+        try:
+            data = json.loads(_clean_json_response(resp))
+            result["ai_argument"] = data.get("ai_argument", result["ai_argument"])
+            result["scores"] = {
+                "logic": min(10, max(1, int(data.get("logic", 5)))),
+                "evidence": min(10, max(1, int(data.get("evidence", 5)))),
+                "persuasion": min(10, max(1, int(data.get("persuasion", 5)))),
+                "fallacies": data.get("fallacies", []),
+                "feedback": data.get("feedback", ""),
+            }
+        except Exception:
+            # If JSON parsing fails, use the raw text as the argument
+            result["ai_argument"] = resp
+
+    return result
+
+
+def debate_final(topic: str, user_stance: str, history: list[dict]) -> dict:
+    """Generate final debate summary with overall scores and winner."""
+    ai_stance = "against" if user_stance.lower() == "for" else "for"
+
+    rounds_text = ""
+    for h in history:
+        rounds_text += f"\n[Round {h.get('round', '?')}]\n"
+        rounds_text += f"Student ({user_stance}): {h.get('user', 'N/A')}\n"
+        rounds_text += f"AI ({ai_stance}): {h.get('ai', 'N/A')}\n"
+        scores = h.get("scores", {})
+        rounds_text += f"Scores: Logic={scores.get('logic', '?')}, Evidence={scores.get('evidence', '?')}, Persuasion={scores.get('persuasion', '?')}\n"
+
+    system = (
+        f"You are an impartial debate judge reviewing a completed debate about: '{topic}'.\n"
+        f"Student argued {user_stance.upper()}, AI argued {ai_stance.upper()}.\n\n"
+        f"Here are all rounds:\n{rounds_text}\n\n"
+        f"Provide a final analysis. Return ONLY JSON with these keys:\n"
+        f'{{"summary": "2-3 sentence overall assessment",'
+        f' "logic": N, "evidence": N, "persuasion": N,'
+        f' "strengths": ["strength1", "strength2", ...],'
+        f' "weaknesses": ["weakness1", "weakness2", ...],'
+        f' "recommendation": "What the student should study/practice to improve",'
+        f' "winner": "student" or "ai" or "tie"}}\n'
+        f"No markdown. Just raw JSON."
+    )
+
+    messages = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": "Judge this debate and provide the final verdict."},
+    ]
+
+    resp = call_ai(messages, model_hint="deepseek", is_json=True)
+    if not resp:
+        resp = call_ai(messages, model_hint="deepseek", is_json=False)
+
+    # Defaults
+    result = {
+        "summary": "Debate completed. Both sides presented their cases.",
+        "total_score": {"logic": 5, "evidence": 5, "persuasion": 5, "fallacies": [], "feedback": ""},
+        "strengths": ["Participated actively"],
+        "weaknesses": ["Could use more supporting evidence"],
+        "recommendation": "Practice structuring arguments with clear evidence.",
+        "winner": "tie",
+    }
+
+    if resp:
+        try:
+            data = json.loads(_clean_json_response(resp))
+            result["summary"] = data.get("summary", result["summary"])
+            result["total_score"] = {
+                "logic": min(10, max(1, int(data.get("logic", 5)))),
+                "evidence": min(10, max(1, int(data.get("evidence", 5)))),
+                "persuasion": min(10, max(1, int(data.get("persuasion", 5)))),
+                "fallacies": [],
+                "feedback": "",
+            }
+            result["strengths"] = data.get("strengths", result["strengths"])
+            result["weaknesses"] = data.get("weaknesses", result["weaknesses"])
+            result["recommendation"] = data.get("recommendation", result["recommendation"])
+            result["winner"] = data.get("winner", result["winner"])
+        except Exception:
+            pass
+
+    return result

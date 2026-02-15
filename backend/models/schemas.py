@@ -277,3 +277,50 @@ class GreetingResponse(BaseModel):
     total_paths: int
     total_messages: int
     date_display: str
+
+
+# ── Debate Arena ──────────────────────────────────────────────────────────────
+
+class DebateStartRequest(BaseModel):
+    topic: str
+    user_stance: str  # "for" or "against"
+    total_rounds: int = 3
+
+
+class DebateRoundRequest(BaseModel):
+    topic: str
+    user_stance: str
+    round_number: int
+    total_rounds: int
+    user_argument: str
+    history: list[dict] = []  # previous rounds [{user: ..., ai: ..., scores: ...}]
+
+
+class DebateScores(BaseModel):
+    logic: int
+    evidence: int
+    persuasion: int
+    fallacies: list[str] = []
+    feedback: str
+
+
+class DebateRoundResponse(BaseModel):
+    ai_argument: str
+    scores: DebateScores
+    round_number: int
+    is_final: bool
+
+
+class DebateFinalRequest(BaseModel):
+    topic: str
+    user_stance: str
+    history: list[dict]
+
+
+class DebateFinalResponse(BaseModel):
+    summary: str
+    total_score: DebateScores
+    strengths: list[str]
+    weaknesses: list[str]
+    recommendation: str
+    winner: str

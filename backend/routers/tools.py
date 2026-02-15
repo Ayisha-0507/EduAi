@@ -11,6 +11,8 @@ from models.schemas import (
     DashboardResponse, GamificationStats, GreetingResponse,
     VisionRequest, VisionResponse,
     FlashcardRequest, FlashcardResponse,
+    DebateStartRequest, DebateRoundRequest, DebateRoundResponse,
+    DebateFinalRequest, DebateFinalResponse,
 )
 from services import ai_service as ai
 from services import firebase_service as fb
@@ -153,6 +155,69 @@ async def generate_flashcards(req: FlashcardRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return FlashcardResponse(cards=cards, topic=req.topic)
+
+
+# ── Debate Arena ───────────────────────────────────────────────────────────────
+
+@router.post("/debate/start")
+async def debate_start(req: DebateStartRequest):
+    """Get the AI's opening argument for a debate. No auth required."""
+    import asyncio
+    if not req.topic.strip():
+        raise HTTPException(status_code=400, detail="Topic cannot be empty")
+    try:
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: ai.debate_round(
+                topic=req.topic,
+                user_stance=req.user_stance,
+                round_number=0,
+                total_rounds=req.total_rounds,
+                user_argument=None,
+                history=[],
+            ),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return result
+
+
+@router.post("/debate/round", response_model=DebateRoundResponse)
+async def debate_round(req: DebateRoundRequest):
+    """Submit user argument, get AI counter-argument + scores."""
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: ai.debate_round(
+                topic=req.topic,
+                user_stance=req.user_stance,
+                round_number=req.round_number,
+                total_rounds=req.total_rounds,
+                user_argument=req.user_argument,
+                history=req.history,
+            ),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return result
+
+
+@router.post("/debate/final", response_model=DebateFinalResponse)
+async def debate_final(req: DebateFinalRequest):
+    """Get final debate summary and overall scores."""
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: ai.debate_final(req.topic, req.user_stance, req.history),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return result
 
 
 # ── Greeting ───────────────────────────────────────────────────────────────────

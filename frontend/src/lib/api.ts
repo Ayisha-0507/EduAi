@@ -211,6 +211,49 @@ export const api = {
       body: JSON.stringify({ image_base64: imageBase64, prompt: message }),
     }),
 
+  // Debate Arena
+  debateStart: (topic: string, userStance: string, totalRounds?: number) =>
+    request<{
+      ai_argument: string;
+      scores: { logic: number; evidence: number; persuasion: number; fallacies: string[]; feedback: string };
+      round_number: number;
+      is_final: boolean;
+    }>("/api/tools/debate/start", {
+      method: "POST",
+      body: JSON.stringify({ topic, user_stance: userStance, total_rounds: totalRounds || 3 }),
+    }),
+
+  debateRound: (data: {
+    topic: string;
+    user_stance: string;
+    round_number: number;
+    total_rounds: number;
+    user_argument: string;
+    history: any[];
+  }) =>
+    request<{
+      ai_argument: string;
+      scores: { logic: number; evidence: number; persuasion: number; fallacies: string[]; feedback: string };
+      round_number: number;
+      is_final: boolean;
+    }>("/api/tools/debate/round", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  debateFinal: (topic: string, userStance: string, history: any[]) =>
+    request<{
+      summary: string;
+      total_score: { logic: number; evidence: number; persuasion: number };
+      strengths: string[];
+      weaknesses: string[];
+      recommendation: string;
+      winner: string;
+    }>("/api/tools/debate/final", {
+      method: "POST",
+      body: JSON.stringify({ topic, user_stance: userStance, history }),
+    }),
+
   // Health
   health: () => request<{ status: string }>("/api/health"),
 };

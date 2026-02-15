@@ -390,12 +390,11 @@ export default function ChatPage() {
 
             {loading && (
               <div className="flex justify-start">
-                <div className="chat-bubble-ai">
-                  <div className="flex items-center gap-2">
-                    <div className="spinner" />
-                    <span className="text-sm text-text-secondary">
-                      Thinking...
-                    </span>
+                <div className="chat-bubble-ai w-[70%] max-w-lg">
+                  <div className="space-y-2.5 animate-pulse">
+                    <div className="h-3 bg-border-default/60 rounded-full w-[85%]" />
+                    <div className="h-3 bg-border-default/40 rounded-full w-[65%]" />
+                    <div className="h-3 bg-border-default/30 rounded-full w-[45%]" />
                   </div>
                 </div>
               </div>

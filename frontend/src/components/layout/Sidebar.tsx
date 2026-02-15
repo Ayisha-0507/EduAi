@@ -21,19 +21,27 @@ import {
   FiSettings,
   FiCamera,
   FiLayers,
+  FiZap,
+  FiUser,
+  FiInfo,
+  FiWifiOff,
 } from "react-icons/fi";
 import { useState, useCallback } from "react";
 
 const navItems = [
   { href: "/chat", label: "Home Chat", icon: FiMessageSquare },
+  { href: "/offline-chat", label: "Offline Chat", icon: FiWifiOff },
   { href: "/vision", label: "Vision Solver", icon: FiCamera },
   { href: "/flashcards", label: "Flashcards", icon: FiLayers },
+  { href: "/debate", label: "Debate Arena", icon: FiZap },
   { href: "/learn", label: "Learning Paths", icon: FiBook },
   { href: "/dashboard", label: "Dashboard", icon: FiBarChart2 },
   { href: "/feynman", label: "Feynman Board", icon: FiCpu },
   { href: "/career", label: "Career Path", icon: FiBriefcase },
   { href: "/summarizer", label: "Summarizer", icon: FiFileText },
   { href: "/settings", label: "Settings", icon: FiSettings },
+  { href: "/profile", label: "My Profile", icon: FiUser },
+  { href: "/about", label: "About EduAI", icon: FiInfo },
 ];
 
 export default function Sidebar() {

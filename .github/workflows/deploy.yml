@@ -41,6 +41,9 @@ jobs:
         working-directory: frontend
         run: npm run build
 
+      - name: Add 404 fallback for SPA routing
+        run: cp frontend/out/index.html frontend/out/404.html
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
