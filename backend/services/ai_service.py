@@ -223,32 +223,27 @@ def _strip_system_messages(messages: list[dict]) -> list[dict]:
 
 def solve_vision(image_base64: str, prompt: str = "This is an educational problem. Solve it step-by-step and provide a clear explanation.") -> tuple[str, str]:
     """Send an image to a vision model for analysis."""
-    client = get_client()
-    # Try multiple vision-capable models in order
-    vision_models = [
-        settings.AI_MODELS["deepseek"],
-    ]
-    messages = [{
-        "role": "user",
-        "content": [
-            {"type": "text", "text": prompt},
-            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_base64}"}},
-        ],
-    }]
-    last_err = None
-    for model_id in vision_models:
-        try:
-            resp = client.chat.completions.create(
-                model=model_id,
-                messages=messages,
-                temperature=0.5,
-                max_tokens=2048,
-            )
-            return resp.choices[0].message.content or "No response", model_id
-        except Exception as e:
-            last_err = e
-            continue
-    raise RuntimeError(f"Vision analysis failed: {last_err}")
+    import google.generativeai as genai
+    import base64
+    import os
+    api_key = os.getenv("GEMINI_API_KEY", getattr(settings, "GEMINI_API_KEY", None))
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY not set in environment or settings.")
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel("gemini-pro-vision")
+    # Decode base64 image
+    image_bytes = base64.b64decode(image_base64)
+    # Gemini expects a PIL Image
+    from PIL import Image
+    from io import BytesIO
+    image = Image.open(BytesIO(image_bytes))
+    # Run Gemini vision
+    response = model.generate_content([
+        prompt,
+        image
+    ])
+    answer = response.text.strip() if hasattr(response, 'text') else str(response)
+    return answer, "gemini-pro-vision"
 
 
 def generate_flashcards(topic: str, num_cards: int = 10) -> list[dict]:
