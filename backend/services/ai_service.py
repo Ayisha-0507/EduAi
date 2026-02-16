@@ -68,19 +68,7 @@ def auto_route(prompt: str) -> str:
         "you are a", "curious student", "feynman", "group discussion",
     ]
 
-    if any(k in p for k in code_kw):
-        return "arcee"
-    if any(k in p for k in visual_kw):
-        return "nemotron"
-    if any(k in p for k in science_visual_kw):
-        return "qwen_vl"
-    if any(k in p for k in reason_kw):
-        return "deepseek"
-    if any(k in p for k in rp_kw):
-        return "nous"
-    # Rotate default model to spread load across free-tier rate limits
-    import random
-    return random.choice(["deepseek", "nous", "arcee"])
+    return "deepseek"
 
 
 # ── Emotion Detection ──────────────────────────────────────────────────────────
@@ -238,9 +226,7 @@ def solve_vision(image_base64: str, prompt: str = "This is an educational proble
     client = get_client()
     # Try multiple vision-capable models in order
     vision_models = [
-        settings.AI_MODELS["qwen_vl"],
-        settings.AI_MODELS["nemotron"],
-        settings.AI_MODELS.get("gemma_vl", "google/gemma-3-27b-it:free"),
+        settings.AI_MODELS["deepseek"],
     ]
     messages = [{
         "role": "user",
@@ -338,7 +324,7 @@ def generate_learning_path_topics(goal: str) -> list[str]:
         {"role": "system", "content": "You are a curriculum designer. Return ONLY a JSON array of 5-7 topic strings for a learning path. No explanations."},
         {"role": "user", "content": f"Create a learning path for: {goal}"},
     ]
-    resp = call_ai(messages, model_hint="nous", is_json=True)
+    resp = call_ai(messages, model_hint="deepseek", is_json=True)
     if resp:
         try:
             data = json.loads(resp)
@@ -367,7 +353,7 @@ def generate_quiz(topic: str, num_questions: int = 5) -> list[dict] | None:
         },
         {"role": "user", "content": f"Topic: {topic}"},
     ]
-    resp = call_ai(messages, model_hint="arcee", is_json=True)
+    resp = call_ai(messages, model_hint="deepseek", is_json=True)
     return parse_quiz_response(resp)
 
 
@@ -418,7 +404,7 @@ def generate_career_paths(interests: str, skills: str, education: str, location:
         {"role": "system", "content": "You are a career counselor AI."},
         {"role": "user", "content": prompt},
     ]
-    return call_ai(messages, model_hint="nous") or ""
+    return call_ai(messages, model_hint="deepseek") or ""
 
 
 def generate_skills_gap(skills: str) -> dict | None:
@@ -427,7 +413,7 @@ def generate_skills_gap(skills: str) -> dict | None:
         {"role": "system", "content": "Return ONLY a JSON object with skill names as keys and proficiency 0-100 as values. No markdown."},
         {"role": "user", "content": f"Based on these current skills ({skills}), rate proficiency for 6-8 relevant career skills."},
     ]
-    resp = call_ai(messages, model_hint="nous", is_json=True)
+    resp = call_ai(messages, model_hint="deepseek", is_json=True)
     if resp:
         try:
             return json.loads(resp) if isinstance(resp, str) else resp

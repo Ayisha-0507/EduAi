@@ -16,22 +16,20 @@ class Settings:
     OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
 
+
     AI_MODELS: dict = {
-        "deepseek":    "google/gemma-2-9b-it:free",
-        "arcee":       "meta-llama/llama-3.2-3b-instruct:free",
-        "nous":        "qwen/qwen-2.5-7b-instruct:free",
-        "blackforest": "black-forest-labs/flux.2-klein-4b",
-        "nemotron":    "nvidia/nemotron-nano-12b-v2-vl:free",
-        "qwen_vl":     "qwen/qwen2.5-vl-72b-instruct:free",
-        "gemma_vl":    "google/gemma-3-27b-it:free",
+        "deepseek": "google/gemini-2.5-pro",
+        "arcee": "google/gemini-2.5-pro",
+        "nous": "google/gemini-2.5-pro",
+        "blackforest": "google/gemini-2.5-pro",
+        "nemotron": "google/gemini-2.5-pro",
+        "qwen_vl": "google/gemini-2.5-pro",
+        "gemma_vl": "google/gemini-2.5-pro",
     }
 
     # Fallback models if primary fails (tried in order)
     FALLBACK_MODELS: list = [
-        "google/gemma-2-9b-it:free",
-        "meta-llama/llama-3.2-3b-instruct:free",
-        "qwen/qwen-2.5-7b-instruct:free",
-        "microsoft/phi-3-mini-128k-instruct:free",
+        "google/gemini-2.5-pro",
     ]
 
     # Rate limit retry settings
