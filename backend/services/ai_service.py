@@ -10,6 +10,7 @@ import re
 import time
 import httpx
 import google.generativeai as genai
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 import os
 
 from config import settings
@@ -140,16 +141,18 @@ def call_ai(
     is_json: bool = False,
     temperature: float = 0.7,
 ) -> str | None:
-    """Send a request directly to Google Gemini API with automatic retry."""
+    """Send a request directly to Google Gemini API with automatic retry and safety handling."""
     
-    # Get API key from env
-    api_key = os.getenv("GEMINI_API_KEY", getattr(settings, "GEMINI_API_KEY", None))
+    # Get API key from env and clean it
+    raw_key = os.getenv("GEMINI_API_KEY", getattr(settings, "GEMINI_API_KEY", ""))
+    api_key = raw_key.strip().strip('"\'') 
+    
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY not set in environment or settings.")
     
     genai.configure(api_key=api_key)
 
-    # 1. Parse messages (Gemini expects system instructions separately from chat history)
+    # 1. Parse messages
     system_instruction = ""
     gemini_history = []
     
@@ -157,18 +160,15 @@ def call_ai(
         if msg["role"] == "system":
             system_instruction += msg["content"] + "\n"
         elif msg["role"] in ["user", "assistant"]:
-            # OpenAI's 'assistant' is Gemini's 'model'
             role = "user" if msg["role"] == "user" else "model"
             gemini_history.append({"role": role, "parts": [msg["content"]]})
     
     if not gemini_history:
         return None
         
-    # The last message should be sent via send_message()
     last_user_message = gemini_history.pop()["parts"][0]
 
     # 2. Setup Model Config
-    # We default to gemini-2.5-pro since it's highly capable for reasoning and json
     model_id = "gemini-2.5-pro"
         
     generation_config = genai.types.GenerationConfig(
@@ -176,31 +176,45 @@ def call_ai(
         max_output_tokens=1024,
     )
     
-    # Force JSON output if required by the feature (like flashcards or quiz)
     if is_json:
         generation_config.response_mime_type = "application/json"
 
-    # 3. Initialize Model and Chat session
+    # 3. Setup Safety Settings (Prevents false positive blocks)
+    safety_settings = {
+        HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+        HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+        HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+        HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+    }
+
+    # 4. Initialize Model and Chat session
     model = genai.GenerativeModel(
         model_name=model_id,
         system_instruction=system_instruction.strip() if system_instruction else None,
-        generation_config=generation_config
+        generation_config=generation_config,
+        safety_settings=safety_settings
     )
     
     chat = model.start_chat(history=gemini_history)
     
-    # 4. Call API with rate limit retries
+    # 5. Call API with rate limit retries & Safe Text Extraction
     for attempt in range(1 + settings.RATE_LIMIT_RETRIES):
         try:
             response = chat.send_message(last_user_message)
-            return response.text
+            
+            # Safely extract text to prevent "finish_reason is 2" crashes
+            try:
+                return response.text
+            except ValueError:
+                # Fallback message if AI blocks the response
+                return "Oops! Edu AI safety filters got triggered or the response was cut off. Can you rephrase that?"
+                
         except Exception as err:
             err_str = str(err).lower()
             if "429" in err_str or "quota" in err_str:
                 if attempt < settings.RATE_LIMIT_RETRIES:
                     time.sleep(settings.RATE_LIMIT_DELAY * (attempt + 1))
                     continue
-            # If it's not a rate limit issue, or retries are exhausted, raise the error
             raise RuntimeError(f"Gemini API error ({model_id}): {err}")
             
     return None
