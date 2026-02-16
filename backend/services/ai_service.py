@@ -1,7 +1,7 @@
 """
 EduAI Backend — AI Service
-Handles all OpenRouter API calls, model routing, and prompt engineering.
-Ported from app.py's _call_openrouter, _auto_route, detect_emotion_and_adapt.
+Handles all Gemini API calls, model routing, and prompt engineering.
+Ported from app.py's _call_openrouter, _auto_route, detect_emotion_and_adapt. OpenRouter logic removed.
 """
 
 from __future__ import annotations
@@ -9,34 +9,19 @@ import json
 import re
 import time
 import httpx
-from openai import OpenAI
+import google.generativeai as genai
+import os
+
 from config import settings
 
 
-# ── OpenRouter Client ──────────────────────────────────────────────────────────
 
-_client: OpenAI | None = None
-
-
-def get_client() -> OpenAI:
-    global _client
-    if _client is None:
-        _client = OpenAI(
-            api_key=settings.OPENROUTER_API_KEY,
-            base_url=settings.OPENROUTER_BASE_URL,
-            http_client=httpx.Client(
-                base_url=settings.OPENROUTER_BASE_URL,
-                follow_redirects=True,
-                timeout=httpx.Timeout(60.0, connect=10.0),
-            ),
-        )
-    return _client
 
 
 # ── Model Selection ────────────────────────────────────────────────────────────
 
 def pick_model(hint: str | None = None) -> str:
-    """Resolve a model key to its full OpenRouter model ID."""
+    """Resolve a model key to its full Gemini model ID."""
     if hint and hint in settings.AI_MODELS:
         return settings.AI_MODELS[hint]
     return settings.AI_MODELS["deepseek"]
@@ -149,86 +134,87 @@ def _is_rate_limit_error(err: Exception) -> bool:
     err_str = str(err).lower()
     return "429" in err_str or "rate limit" in err_str or "rate_limit" in err_str or "too many requests" in err_str
 
-
 def call_ai(
     messages: list[dict],
     model_hint: str | None = None,
     is_json: bool = False,
     temperature: float = 0.7,
 ) -> str | None:
-    """Send a request to OpenRouter with automatic retry on rate limits and multi-model fallback."""
-    client = get_client()
-    model_id = pick_model(model_hint)
+    """Send a request directly to Google Gemini API with automatic retry."""
+    
+    # Get API key from env
+    api_key = os.getenv("GEMINI_API_KEY", getattr(settings, "GEMINI_API_KEY", None))
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY not set in environment or settings.")
+    
+    genai.configure(api_key=api_key)
 
-    kwargs: dict = {
-        "model": model_id,
-        "messages": messages,
-        "temperature": temperature,
-        "max_tokens": 1024,
-    }
+    # 1. Parse messages (Gemini expects system instructions separately from chat history)
+    system_instruction = ""
+    gemini_history = []
+    
+    for msg in messages:
+        if msg["role"] == "system":
+            system_instruction += msg["content"] + "\n"
+        elif msg["role"] in ["user", "assistant"]:
+            # OpenAI's 'assistant' is Gemini's 'model'
+            role = "user" if msg["role"] == "user" else "model"
+            gemini_history.append({"role": role, "parts": [msg["content"]]})
+    
+    if not gemini_history:
+        return None
+        
+    # The last message should be sent via send_message()
+    last_user_message = gemini_history.pop()["parts"][0]
+
+    # 2. Setup Model Config
+    # We default to gemini-2.5-pro since it's highly capable for reasoning and json
+    model_id = "gemini-2.5-pro"
+        
+    generation_config = genai.types.GenerationConfig(
+        temperature=temperature,
+        max_output_tokens=1024,
+    )
+    
+    # Force JSON output if required by the feature (like flashcards or quiz)
     if is_json:
-        kwargs["response_format"] = {"type": "json_object"}
+        generation_config.response_mime_type = "application/json"
 
-    # Try primary model with rate-limit retry
+    # 3. Initialize Model and Chat session
+    model = genai.GenerativeModel(
+        model_name=model_id,
+        system_instruction=system_instruction.strip() if system_instruction else None,
+        generation_config=generation_config
+    )
+    
+    chat = model.start_chat(history=gemini_history)
+    
+    # 4. Call API with rate limit retries
     for attempt in range(1 + settings.RATE_LIMIT_RETRIES):
         try:
-            resp = client.chat.completions.create(**kwargs)
-            return resp.choices[0].message.content
-        except Exception as primary_err:
-            if _is_rate_limit_error(primary_err) and attempt < settings.RATE_LIMIT_RETRIES:
-                time.sleep(settings.RATE_LIMIT_DELAY * (attempt + 1))
-                continue
-            # Not a rate limit or retries exhausted — fall through to fallbacks
-            break
-
-    # Try each fallback model in order
-    last_err: Exception = Exception("No models available")
-    for fb_model in settings.FALLBACK_MODELS:
-        if fb_model == model_id:
-            continue  # Skip if same as primary
-        try:
-            fb_kwargs = {**kwargs, "model": fb_model}
-            # Some models don't support system messages — merge into user
-            if "gemma" in fb_model:
-                fb_kwargs["messages"] = _strip_system_messages(messages)
-            # Some free models don't support response_format — remove it
-            if "response_format" in fb_kwargs:
-                fb_kwargs.pop("response_format", None)
-            resp = client.chat.completions.create(**fb_kwargs)
-            return resp.choices[0].message.content
-        except Exception as fb_err:
-            last_err = fb_err
-            if _is_rate_limit_error(fb_err):
-                time.sleep(1)  # Brief pause before next fallback
-            continue
-    raise RuntimeError(
-        f"AI error ({model_id}): All models rate-limited or failed. Last: {last_err}"
-    )
-
-
-def _strip_system_messages(messages: list[dict]) -> list[dict]:
-    """Merge system messages into the first user message for models that don't support them."""
-    system_parts = []
-    other = []
-    for m in messages:
-        if m["role"] == "system":
-            system_parts.append(m["content"])
-        else:
-            other.append(m)
-    if system_parts and other:
-        prefix = "\n".join(system_parts)
-        other[0] = {**other[0], "content": f"{prefix}\n\n{other[0]['content']}"}
-    return other or messages
-
+            response = chat.send_message(last_user_message)
+            return response.text
+        except Exception as err:
+            err_str = str(err).lower()
+            if "429" in err_str or "quota" in err_str:
+                if attempt < settings.RATE_LIMIT_RETRIES:
+                    time.sleep(settings.RATE_LIMIT_DELAY * (attempt + 1))
+                    continue
+            # If it's not a rate limit issue, or retries are exhausted, raise the error
+            raise RuntimeError(f"Gemini API error ({model_id}): {err}")
+            
+    return None
 
 def solve_vision(image_base64: str, prompt: str = "This is an educational problem. Solve it step-by-step and provide a clear explanation.") -> tuple[str, str]:
-    """Send an image to a vision model for analysis."""
+    """Send an image to Gemini vision model for analysis."""
     import google.generativeai as genai
     import base64
     import os
     api_key = os.getenv("GEMINI_API_KEY", getattr(settings, "GEMINI_API_KEY", None))
     if not api_key:
-        raise RuntimeError("GEMINI_API_KEY not set in environment or settings.")
+        api_key = os.getenv("GOOGLE_STUDIO_API_KEY", getattr(settings, "GOOGLE_STUDIO_API_KEY", None))
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY or GOOGLE_STUDIO_API_KEY not set in environment or settings.")
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel("gemini-pro-vision")
     # Decode base64 image
