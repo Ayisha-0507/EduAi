@@ -9,4 +9,4 @@ plotly
 streamlit-agraph
 streamlit-ace
 streamlit-cropper
-google-generative ai
+google-generativeai

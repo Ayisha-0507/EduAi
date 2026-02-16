@@ -496,9 +496,9 @@ def debate_round(
             {"role": "system", "content": system},
             {"role": "user", "content": f"Begin your opening argument {ai_stance} the topic: {topic}"},
         ]
-        resp = call_ai(messages, model_hint="nous", is_json=True)
+        resp = call_ai(messages, model_hint="deepseek", is_json=True)
         if not resp:
-            resp = call_ai(messages, model_hint="nous", is_json=False)
+            resp = call_ai(messages, model_hint="deepseek", is_json=False)
 
         ai_arg = topic  # fallback
         if resp:
@@ -547,9 +547,9 @@ def debate_round(
         messages.append({"role": "assistant", "content": f"Previous rounds:{history_text}"})
     messages.append({"role": "user", "content": f"Student's argument ({user_stance}): {user_argument}"})
 
-    resp = call_ai(messages, model_hint="nous", is_json=True)
+    resp = call_ai(messages, model_hint="deepseek", is_json=True)
     if not resp:
-        resp = call_ai(messages, model_hint="nous", is_json=False)
+        resp = call_ai(messages, model_hint="deepseek", is_json=False)
 
     # Parse response
     result = {
@@ -608,9 +608,9 @@ def debate_final(topic: str, user_stance: str, history: list[dict]) -> dict:
         {"role": "user", "content": "Judge this debate and provide the final verdict."},
     ]
 
-    resp = call_ai(messages, model_hint="nous", is_json=True)
+    resp = call_ai(messages, model_hint="deepseek", is_json=True)
     if not resp:
-        resp = call_ai(messages, model_hint="nous", is_json=False)
+        resp = call_ai(messages, model_hint="deepseek", is_json=False)
 
     # Defaults
     result = {
