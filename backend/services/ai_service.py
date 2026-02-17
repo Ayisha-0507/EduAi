@@ -8,8 +8,8 @@ from __future__ import annotations
 import json
 import re
 import time
-import httpx
 import google.generativeai as genai
+import httpx
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 import os
 
@@ -179,48 +179,100 @@ def call_ai(
 
     # 2. Setup stable model
     model_id = "gemini-1.5-pro"
-        
-    generation_config = genai.types.GenerationConfig(
-        temperature=temperature,
-        max_output_tokens=2048,
-    )
-    if is_json:
-        generation_config.response_mime_type = "application/json"
+    generation_config = genai.types.GenerationConfig()
 
-    # 3. Use BLOCK_ONLY_HIGH (BLOCK_NONE causes errors on free tier accounts)
-    safety_settings = {
-        HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
-        HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_ONLY_HIGH,
-        HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
-        HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
-    }
+    api_key = os.getenv("GEMINI_API_KEY", getattr(settings, "GEMINI_API_KEY", None))
+    if not api_key:
+        api_key = os.getenv("GOOGLE_STUDIO_API_KEY", getattr(settings, "GOOGLE_STUDIO_API_KEY", None))
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY or GOOGLE_STUDIO_API_KEY not set in environment or settings.")
 
-    model = genai.GenerativeModel(
-        model_name=model_id,
-        system_instruction=system_instruction.strip() if system_instruction else None,
-        generation_config=generation_config,
-        safety_settings=safety_settings
-    )
-    
-    # 4. Call API directly without maintaining strict chat state
-    for attempt in range(1 + settings.RATE_LIMIT_RETRIES):
+    genai.configure(api_key=api_key)
+
+    # Build ordered candidate list: hinted model, configured fallbacks
+    primary_model = pick_model(model_hint)
+    candidates: list[str] = [primary_model]
+    if getattr(settings, "FALLBACK_MODELS", None):
+        for m in settings.FALLBACK_MODELS:
+            if m not in candidates:
+                candidates.append(m)
+
+    # Helper to fetch remote models from Google Studio if needed
+    def _fetch_remote_models() -> list[str]:
         try:
-            response = model.generate_content(contents)
-            
-            if response.parts:
-                return response.text
-            else:
-                reason = response.candidates[0].finish_reason if response.candidates else "Unknown"
-                return f"API Blocked Response. Reason code: {reason}"
-                
-        except Exception as err:
-            err_str = str(err).lower()
-            if "429" in err_str or "quota" in err_str:
-                if attempt < settings.RATE_LIMIT_RETRIES:
+            resp = httpx.get(f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}", timeout=10.0)
+            if resp.status_code == 200:
+                data = resp.json()
+                mods = [m.get("name") or m for m in data.get("models", [])]
+                return mods
+        except Exception:
+            pass
+        return []
+
+    # Convert OpenAI-style messages to Gemini prompt
+    prompt = ""
+    for msg in messages:
+        role = msg.get("role", "user")
+        content = msg.get("content", "")
+        if role == "system":
+            prompt += f"[System] {content}\n"
+        elif role == "assistant":
+            prompt += f"[AI] {content}\n"
+        else:
+            prompt += f"[User] {content}\n"
+
+    last_err: Exception | None = None
+    tried = set()
+
+    # Try each candidate model with retry on rate limits
+    for model_id in candidates:
+        if not model_id or model_id in tried:
+            continue
+        tried.add(model_id)
+        model = genai.GenerativeModel(model_id)
+        for attempt in range(1 + settings.RATE_LIMIT_RETRIES):
+            try:
+                response = model.generate_content(prompt, generation_config={"temperature": temperature}, safety_settings=None)
+                answer = response.text.strip() if hasattr(response, "text") else str(response)
+                return answer
+            except Exception as err:
+                last_err = err
+                if _is_rate_limit_error(err) and attempt < settings.RATE_LIMIT_RETRIES:
                     time.sleep(settings.RATE_LIMIT_DELAY * (attempt + 1))
                     continue
-            return f"API Error caught: {str(err)}"
-            
+                # If error suggests model not found/unsupported, break to try next candidate
+                e = str(err).lower()
+                if "not found" in e or "not supported" in e or "404" in e or "models/" in e:
+                    break
+                # otherwise, stop retrying this model
+                break
+
+    # If all configured candidates failed, fetch remote models and try them
+    remote_models = _fetch_remote_models()
+    for model_id in remote_models:
+        if not model_id or model_id in tried:
+            continue
+        tried.add(model_id)
+        try:
+            model = genai.GenerativeModel(model_id)
+            for attempt in range(1 + settings.RATE_LIMIT_RETRIES):
+                try:
+                    response = model.generate_content(prompt, generation_config={"temperature": temperature}, safety_settings=None)
+                    answer = response.text.strip() if hasattr(response, "text") else str(response)
+                    return answer
+                except Exception as err:
+                    last_err = err
+                    if _is_rate_limit_error(err) and attempt < settings.RATE_LIMIT_RETRIES:
+                        time.sleep(settings.RATE_LIMIT_DELAY * (attempt + 1))
+                        continue
+                    break
+        except Exception as err:
+            last_err = err
+            continue
+
+    # If we reach here, all attempts failed
+    if last_err:
+        return f"API Error caught: {str(last_err)}"
     return "Failed to get response after retries."
 def solve_vision(image_base64: str, prompt: str = "This is an educational problem. Solve it step-by-step and provide a clear explanation.") -> tuple[str, str]:
     """Send an image to Gemini vision model for analysis."""

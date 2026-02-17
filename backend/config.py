@@ -12,25 +12,53 @@ env_path = Path(__file__).parent / ".env"
 load_dotenv(env_path)
 
 class Settings:
+    # Model key to model ID mapping for AI service (Google Studio / Gemini only)
+    AI_MODELS: dict = {
+        "gemini-2.5-pro": "models/gemini-2.5-pro",
+        "gemini-2.5-flash": "models/gemini-2.5-flash",
+        "gemini-2.0-flash": "models/gemini-2.0-flash",
+        "gemini-2.0-flash-001": "models/gemini-2.0-flash-001",
+        "gemini-2.0-flash-exp-image-generation": "models/gemini-2.0-flash-exp-image-generation",
+        "gemini-2.0-flash-lite-001": "models/gemini-2.0-flash-lite-001",
+        "gemini-2.0-flash-lite": "models/gemini-2.0-flash-lite",
+        "gemini-exp-1206": "models/gemini-exp-1206",
+        "gemini-2.5-flash-preview-tts": "models/gemini-2.5-flash-preview-tts",
+    }
+    # Fallback models if primary fails (tried in order)
+    FALLBACK_MODELS: list = [
+        "models/gemini-2.0-flash",
+        "models/gemini-2.5-flash",
+        "google/gemini-3-pro-preview",
+    ]
+    # Model key to model ID mapping for AI service (Google Studio / Gemini only)
+    AI_MODELS: dict = {
+        "gemini-2.5-pro": "models/gemini-2.5-pro",
+        "gemini-2.5-flash": "models/gemini-2.5-flash",
+        "gemini-2.0-flash": "models/gemini-2.0-flash",
+        "gemini-2.0-flash-001": "models/gemini-2.0-flash-001",
+        "gemini-2.0-flash-exp-image-generation": "models/gemini-2.0-flash-exp-image-generation",
+        "gemini-2.0-flash-lite-001": "models/gemini-2.0-flash-lite-001",
+        "gemini-2.0-flash-lite": "models/gemini-2.0-flash-lite",
+        "gemini-exp-1206": "models/gemini-exp-1206",
+        "gemini-2.5-flash-preview-tts": "models/gemini-2.5-flash-preview-tts",
+    }
     # ── AI ──────────────────────────────────────────────────────────────
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
 
+    # Google Studio API
+    GOOGLE_STUDIO_API_KEY: str = os.getenv("GOOGLE_STUDIO_API_KEY", "")
 
-    AI_MODELS: dict = {
-        "deepseek": "google/gemini-2.5-pro",
-        "arcee": "google/gemini-2.5-pro",
-        "nous": "google/gemini-2.5-pro",
-        "blackforest": "google/gemini-2.5-pro",
-        "nemotron": "google/gemini-2.5-pro",
-        "qwen_vl": "google/gemini-2.5-pro",
-        "gemma_vl": "google/gemini-2.5-pro",
-    }
+
+   
 
     # Fallback models if primary fails (tried in order)
     FALLBACK_MODELS: list = [
-        "google/gemini-2.5-pro",
-    ]
+    "google/gemini-3-pro-preview",
+]
+    
+    
 
     # Rate limit retry settings
     RATE_LIMIT_RETRIES: int = 2
