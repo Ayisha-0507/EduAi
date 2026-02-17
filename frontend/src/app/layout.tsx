@@ -1,5 +1,8 @@
+
 import "@/styles/globals.css";
 import type { Metadata, Viewport } from "next";
+import LocaleProvider from "@/lib/LocaleProvider";
+import FeedbackButton from "@/components/layout/FeedbackButton";
 
 export const metadata: Metadata = {
   title: "EduAI — Personal AI Tutor",
@@ -24,7 +27,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        <LocaleProvider>{children}</LocaleProvider>
+        <FeedbackButton />
+      </body>
     </html>
   );
 }

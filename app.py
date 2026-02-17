@@ -1,11 +1,9 @@
 # ─────────────────────────────────────────────────────────────────────────────
-#  EduAI — Adaptive Multi-Model Tutoring Platform
-#  Author : Ayisha
-#  Version: 1.0
+#  EduAI — Adaptive Gemini-Powered Tutoring Platform
 # ─────────────────────────────────────────────────────────────────────────────
 
 import streamlit as st
-import openai
+from gemini_rotator import GeminiRotator
 import base64
 import io
 import os
@@ -203,55 +201,35 @@ def initialize_firebase():
 
 db = initialize_firebase()
 
-# ── Multi-Model AI Configuration (OpenRouter) ──────────────────────────────────
+# ── Gemini AI Configuration ─────────────────────────────────────────────────────
 
-AI_MODELS = {
-    "deepseek":    "deepseek/deepseek-r1-0528:free",                                  # General tutoring & Reasoning
-    "arcee":       "arcee-ai/trinity-large-preview:free",                             # Programming, tech & coding
-    "nous":        "nousresearch/hermes-3-llama-3.1-405b:free",                        # Roleplay & agentic
-    "blackforest": "black-forest-labs/flux.2-klein-4b",                               # Image generation
-    "nemotron":    "nvidia/nemotron-nano-12b-v2-vl:free",                             # Textbooks, diagrams, charts & video lectures
-    "qwen_vl":     "qwen/qwen3-vl-30b-a3b-thinking",                                 # Math/science tutoring & visual comprehension
-}
+GEMINI_MODEL = "gemini-2.5-flash"  # Primary model
 
 @st.cache_resource
-def get_openrouter_client():
+def get_gemini_client():
+    """Initialize and return a GeminiRotator instance."""
     try:
-        api_key = st.secrets["OPENROUTER_API_KEY"]
-        return openai.OpenAI(
-            api_key=api_key,
-            base_url="https://openrouter.ai/api/v1",
-        )
+        rotator = GeminiRotator()
+        return rotator
     except Exception as e:
-        st.error(f"🔑 API configuration failed: {e}", icon="🚨")
+        st.error(f"🔑 Gemini API configuration failed: {e}", icon="🚨")
         return None
 
-client = get_openrouter_client()
+client = get_gemini_client()
 
-def _pick_model(hint: str | None = None) -> str:
-    """Resolve a model hint to its full OpenRouter model ID."""
-    if hint and hint in AI_MODELS:
-        return AI_MODELS[hint]
-    return AI_MODELS["deepseek"]  # default
-
-def _call_openrouter(messages: list, model_hint: str | None = None,
-                     is_json: bool = False, temperature: float = 0.7) -> str | None:
-    """Send a request to OpenRouter and return the response text, or None on failure."""
+def _call_gemini(prompt: str, is_json: bool = False) -> str | None:
+    """Send a prompt to Gemini and return the response text, or None on failure."""
     if not client:
         return None
-    model_id = _pick_model(model_hint)
-    kwargs: dict = {
-        "model": model_id,
-        "messages": messages,
-        "temperature": temperature,
-    }
     if is_json:
-        kwargs["response_format"] = {"type": "json_object"}
+        prompt = prompt + "\n\nIMPORTANT: Respond ONLY with valid JSON. No extra text, no markdown formatting."
     try:
-        resp = client.chat.completions.create(**kwargs)
-        return resp.choices[0].message.content
+        resp = client.generate_content(GEMINI_MODEL, prompt)
+        if resp and resp.get('choices'):
+            return resp['choices'][0]['message']['content']
+        return None
     except Exception as e:
-        st.error(f"AI error ({model_id}): {e}", icon="🚨")
+        st.error(f"AI error (Gemini): {e}", icon="🚨")
         return None
 
 # ── Session State ─────────────────────────────────────────────────────────────
@@ -264,7 +242,6 @@ def init_session_state():
             'loading_complete': False, 'current_quiz_data': None,
             'guest_mode': False, 'review_session_active': False,
             'badge_filter': None, 'quick_action': None,
-            'model_selection_mode': 'Auto', 'manual_model_choice': 'deepseek'
         }
 
 def safe_rerun():
@@ -531,50 +508,12 @@ def save_feedback(uid, path_name, topic, feedback, response, style=None, persona
     db.collection('user_feedback').document().set(data)
     st.toast("Feedback submitted. Thank you!", icon="👍")
 
-def _auto_route(prompt: str) -> str | None:
-    """Pick the best model based on keyword analysis of the prompt."""
-    p = prompt.lower()
-    code_kw = ["code", "python", "javascript", "function", "debug", "programming",
-               "algorithm", "api", "html", "css", "sql", "compile", "syntax"]
-    reason_kw = ["solve", "calculate", "math", "proof", "derive", "equation",
-                 "reason", "logic", "quiz", "step-by-step", "analyze"]
-    rp_kw = ["act as", "roleplay", "simulate", "pretend", "character",
-             "you are a", "curious student", "feynman", "group discussion"]
-    visual_kw = ["diagram", "chart", "textbook", "graph", "table", "figure",
-                 "image", "photo", "picture", "screenshot", "slide", "video",
-                 "lecture", "handwriting", "scan", "document", "pdf"]
-    science_visual_kw = ["visual", "physics", "chemistry", "biology", "science",
-                         "experiment", "formula", "lab", "interactive"]
-    if any(k in p for k in code_kw):
-        return "arcee"
-    if any(k in p for k in visual_kw):
-        return "nemotron"
-    if any(k in p for k in science_visual_kw):
-        return "qwen_vl"
-    if any(k in p for k in reason_kw):
-        return "deepseek"
-    if any(k in p for k in rp_kw):
-        return "nous"
-    return "deepseek"  # default fallback for general queries
-
-
 def generate_ai_response(prompt, is_json=False, model_hint=None):
-    """Route a prompt through the appropriate AI model and return the response text."""
+    """Send a prompt to Gemini and return the response text."""
     if not client:
         return None
-    mode = st.session_state.session.get('model_selection_mode', 'Auto')
-    if model_hint:
-        hint = model_hint
-    elif mode == 'Manual':
-        hint = st.session_state.session.get('manual_model_choice', 'deepseek')
-    else:
-        hint = _auto_route(prompt)
-    with st.spinner("`🧠 Cognitive core is processing...`"):
-        return _call_openrouter(
-            [{"role": "user", "content": prompt}],
-            model_hint=hint,
-            is_json=is_json,
-        )
+    with st.spinner("`🧠 Gemini is thinking...`"):
+        return _call_gemini(prompt, is_json=is_json)
 
 def parse_quiz_data(quiz_text):
     """Parse a JSON quiz response into a dict with 'question', 'options', 'answer' keys."""
@@ -645,18 +584,19 @@ def add_guidance_message(role, content):
 
 def generate_guidance_response(prompt_text, stream=False, is_json=False):
     """Generate an AI response within the onboarding guidance conversation context."""
-    # Build OpenAI-style messages from guidance chat history
-    messages = []
+    # Build context from guidance chat history
+    context_parts = []
     for msg in get_guidance_chat_history():
         role = msg["role"]
         if role == "model":
-            role = "assistant"  # OpenAI format
+            role = "assistant"
         if role in ["user", "assistant"]:
-            messages.append({"role": role, "content": msg["content"]})
-    messages.append({"role": "user", "content": prompt_text})
+            context_parts.append(f"{role}: {msg['content']}")
+    
+    full_prompt = "\n".join(context_parts) + f"\nuser: {prompt_text}"
 
     try:
-        return _call_openrouter(messages, model_hint="deepseek", is_json=is_json)
+        return _call_gemini(full_prompt, is_json=is_json)
     except Exception as e:
         st.error(f"AI Guidance error: {e}")
         return "Sorry, I encountered an error during guidance. Please try again."
@@ -1339,35 +1279,25 @@ def render_vision_tab():
 
             with st.spinner("Analyzing visual data..."):
                 try:
-                    # Encode the image as base64 for OpenRouter vision
-                    buf = io.BytesIO()
-                    image.save(buf, format="PNG")
-                    b64_img = base64.b64encode(buf.getvalue()).decode("utf-8")
-
-                    messages = [{
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": "This is an educational problem. Solve it step-by-step and provide a clear explanation."},
-                            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64_img}"}},
-                        ],
-                    }]
-                    resp = _call_openrouter(messages, model_hint="qwen_vl")
+                    # For now, use text-based analysis via Gemini
+                    # (Image vision requires the google.generativeai SDK directly)
+                    st.info("Vision analysis: Describe the problem in the Home Chat for AI assistance.")
+                    prompt = "The user has uploaded an educational image/problem. Please explain that you can help them if they describe the problem in text form, and offer to solve any math/science/educational problem they describe."
+                    resp = _call_gemini(prompt)
                     if resp:
-                        st.markdown("### Solution")
+                        st.markdown("### AI Response")
                         st.write(resp)
-                    else:
-                        st.warning("Could not analyze the image. Try describing the problem in the Home Chat instead.")
                 except Exception as e:
                     st.error(f"Vision analysis failed: {e}")
 
-def _feynman_history_to_messages(history: list) -> list:
-    """Convert the Feynman chat history into OpenAI-style messages."""
-    messages = []
+def _feynman_history_to_prompt(history: list) -> str:
+    """Convert the Feynman chat history into a single text prompt."""
+    parts = []
     for msg in history:
         content = msg['parts'][0] if isinstance(msg['parts'], list) else msg['parts']
-        role = "assistant" if msg['role'] == 'model' else "user"
-        messages.append({"role": role, "content": content})
-    return messages
+        role = "AI Student" if msg['role'] == 'model' else "Teacher"
+        parts.append(f"{role}: {content}")
+    return "\n".join(parts)
 
 
 def render_feynman_tab():
@@ -1389,10 +1319,7 @@ def render_feynman_tab():
         init_prompt = f"I want to teach you about '{topic}'. Act as a curious, slightly confused student. Ask clarifying questions to test my understanding. Don't just say 'good job' or lecture me. Probe for details. Start by asking me to explain the basic concept."
 
         try:
-            resp = _call_openrouter(
-                [{"role": "user", "content": init_prompt}],
-                model_hint="nous",
-            )
+            resp = _call_gemini(init_prompt)
             if resp:
                 st.session_state['feynman_history'].append({'role': 'user', 'parts': [init_prompt]})
                 st.session_state['feynman_history'].append({'role': 'model', 'parts': [resp]})
@@ -1416,8 +1343,8 @@ def render_feynman_tab():
 
         with st.spinner("Student is thinking..."):
             try:
-                messages = _feynman_history_to_messages(st.session_state['feynman_history'])
-                reply = _call_openrouter(messages, model_hint="nous")
+                history_prompt = _feynman_history_to_prompt(st.session_state['feynman_history'])
+                reply = _call_gemini(history_prompt)
                 if reply:
                     st.session_state['feynman_history'].append({'role': 'model', 'parts': [reply]})
                     with st.chat_message("student", avatar=None):
@@ -3292,31 +3219,8 @@ def main():
                     st.checkbox("Enable safe rendering (escape persisted content before display)", value=st.session_state.get('settings_safe_rendering', True), key='settings_safe_rendering')
 
                     st.markdown("---")
-                    st.subheader("AI Model Selection")
-                    
-                    selection_modes = ["Auto", "Manual"]
-                    current_mode = st.session_state.session.get('model_selection_mode', 'Auto')
-                    new_mode = st.radio("Model Selection Mode:", selection_modes, 
-                                        index=selection_modes.index(current_mode),
-                                        help="Auto: Automatically choose the best model based on your query. Manual: Stick to one specific model.",
-                                        key="model_mode_radio", horizontal=True)
-                    
-                    if new_mode == "Manual":
-                        available_models = list(AI_MODELS.keys())
-                        current_choice = st.session_state.session.get('manual_model_choice', 'deepseek')
-                        new_choice = st.selectbox("Choose AI Model:", available_models,
-                                                 index=available_models.index(current_choice) if current_choice in available_models else 0,
-                                                 key="manual_model_select")
-                        if new_choice != current_choice:
-                            st.session_state.session['manual_model_choice'] = new_choice
-                            if db and uid:
-                                db.collection('users').document(uid).set({'manual_model_choice': new_choice}, merge=True)
-                    
-                    if new_mode != current_mode:
-                        st.session_state.session['model_selection_mode'] = new_mode
-                        if db and uid:
-                            db.collection('users').document(uid).set({'model_selection_mode': new_mode}, merge=True)
-                        st.rerun()
+                    st.subheader("AI Model")
+                    st.info(f"🤖 Using **Gemini** (`{GEMINI_MODEL}`) with key rotation ({len(client.keys_data.get('keys', []))} keys available)" if client else "⚠️ Gemini client not initialized.")
 
                     st.markdown("---")
                     st.subheader("Cleanup Tools")

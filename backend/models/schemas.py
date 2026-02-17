@@ -20,18 +20,8 @@ class TutorPersona(str, Enum):
     CREATIVE = "Creative Storyteller"
 
 
-class ModelSelectionMode(str, Enum):
-    AUTO = "Auto"
-    MANUAL = "Manual"
-
-
 class ModelKey(str, Enum):
-    DEEPSEEK = "deepseek"
-    ARCEE = "arcee"
-    NOUS = "nous"
-    BLACKFOREST = "blackforest"
-    NEMOTRON = "nemotron"
-    QWEN_VL = "qwen_vl"
+    GEMINI = "gemini"
 
 
 class ResponseStyle(str, Enum):
@@ -84,8 +74,6 @@ class UserProfile(BaseModel):
     contact: str = ""
     avatar_url: str = ""
     tutor_persona: TutorPersona = TutorPersona.FRIENDLY
-    model_selection_mode: ModelSelectionMode = ModelSelectionMode.AUTO
-    manual_model_choice: ModelKey = ModelKey.DEEPSEEK
     preferred_language: str = "English"
     timezone: str = ""
     email_verified: bool = False
@@ -97,8 +85,6 @@ class ProfileUpdateRequest(BaseModel):
     bio: Optional[str] = None
     contact: Optional[str] = None
     tutor_persona: Optional[TutorPersona] = None
-    model_selection_mode: Optional[ModelSelectionMode] = None
-    manual_model_choice: Optional[ModelKey] = None
     preferred_language: Optional[str] = None
     timezone: Optional[str] = None
 

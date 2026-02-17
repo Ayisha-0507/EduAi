@@ -75,7 +75,7 @@ def create_user(email: str, password: str, nickname: str | None = None) -> auth.
             "avatar_url": "",
             "tutor_persona": "Friendly Encourager",
             "model_selection_mode": "Auto",
-            "manual_model_choice": "deepseek",
+            "manual_model_choice": "gemini-2.5-pro",
             "preferred_language": "English",
             "timezone": "",
             "created_at": firestore.SERVER_TIMESTAMP,

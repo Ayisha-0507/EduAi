@@ -2,7 +2,7 @@
 
 > **Edu AI: Your Personal AI Tutor**
 > **Author:** Ayisha
-> **Version:** 10.1 — Multi-Model AI (DeepSeek · Arcee · NousHermes · BlackForest)
+> **Version:** 10.1 — Google Studio AI (Gemini)
 
 ---
 
@@ -61,7 +61,7 @@
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
 | **Frontend** | Streamlit (Python) | Web UI framework with reactive components |
-| **AI Backend** | OpenRouter API (OpenAI-compatible) | Multi-model AI inference |
+| **AI Backend** | Google Studio AI (Gemini) | Google Generative AI inference |
 | **Database** | Firebase Firestore | User data, learning paths, quiz attempts, feedback |
 | **Authentication** | Firebase Auth | Email/password + Google OAuth 2.0 |
 | **Storage** | Firebase Cloud Storage | User avatar images |
@@ -197,6 +197,17 @@ streamlit run app.py
 ---
 
 ## 6. Configuration
+
+
+### `backend/.env`
+
+Add your Google Studio API key for Gemini/Generative AI access:
+
+```env
+GOOGLE_STUDIO_API_KEY=your-google-studio-api-key-here
+```
+
+This key will be used as a fallback if `GEMINI_API_KEY` is not set. It is loaded automatically by the backend and used for all Gemini/Google Generative AI API calls.
 
 ### `.streamlit/secrets.toml`
 

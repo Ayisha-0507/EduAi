@@ -7,6 +7,7 @@
  */
 
 import { usePathname } from "next/navigation";
+import { useTranslations } from 'next-intl';
 import Link from "next/link";
 import { useAuthStore } from "@/lib/store";
 import {
@@ -30,24 +31,28 @@ import {
   FiChevronRight,
 } from "react-icons/fi";
 import { useState, useCallback, useEffect } from "react";
+import LanguageSwitcher from "@/components/layout/LanguageSwitcher";
+import ThemeToggle from "@/components/layout/ThemeToggle";
+
 
 const navItems = [
-  { href: "/chat", label: "Home Chat", icon: FiMessageSquare },
-  { href: "/offline-chat", label: "Offline Chat", icon: FiWifiOff },
-  { href: "/vision", label: "Vision Solver", icon: FiCamera },
-  { href: "/flashcards", label: "Flashcards", icon: FiLayers },
-  { href: "/debate", label: "Debate Arena", icon: FiZap },
-  { href: "/learn", label: "Learning Paths", icon: FiBook },
-  { href: "/dashboard", label: "Dashboard", icon: FiBarChart2 },
-  { href: "/feynman", label: "Feynman Board", icon: FiCpu },
-  { href: "/career", label: "Career Path", icon: FiBriefcase },
-  { href: "/summarizer", label: "Summarizer", icon: FiFileText },
-  { href: "/settings", label: "Settings", icon: FiSettings },
-  { href: "/profile", label: "My Profile", icon: FiUser },
-  { href: "/about", label: "About EduAI", icon: FiInfo },
+  { href: "/chat", key: "homeChat", icon: FiMessageSquare },
+  { href: "/offline-chat", key: "offlineChat", icon: FiWifiOff },
+  { href: "/vision", key: "visionSolver", icon: FiCamera },
+  { href: "/flashcards", key: "flashcards", icon: FiLayers },
+  { href: "/debate", key: "debateArena", icon: FiZap },
+  { href: "/learn", key: "learningPaths", icon: FiBook },
+  { href: "/dashboard", key: "dashboard", icon: FiBarChart2 },
+  { href: "/feynman", key: "feynmanBoard", icon: FiCpu },
+  { href: "/career", key: "careerPath", icon: FiBriefcase },
+  { href: "/summarizer", key: "summarizer", icon: FiFileText },
+  { href: "/settings", key: "settings", icon: FiSettings },
+  { href: "/profile", key: "myProfile", icon: FiUser },
+  { href: "/about", key: "about", icon: FiInfo },
 ];
 
 export default function Sidebar() {
+  const t = useTranslations();
   const pathname = usePathname();
   const { user, logout, isGuest } = useAuthStore();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -71,7 +76,7 @@ export default function Sidebar() {
 
   const handleLogout = useCallback(() => {
     logout();
-    window.location.href = "/";
+    window.location.href = "/login";
   }, [logout]);
 
   const navContent = (
@@ -81,7 +86,7 @@ export default function Sidebar() {
         {!collapsed && (
           <div>
             <h2 className="text-xl font-bold bg-gradient-to-r from-accent-green to-accent-blue bg-clip-text text-transparent">
-              EduAI
+              {t('appName')}
             </h2>
             {user && (
               <p className="text-xs text-text-secondary mt-1 truncate">
@@ -105,7 +110,7 @@ export default function Sidebar() {
               href={item.href}
               prefetch={true}
               onClick={() => setMobileOpen(false)}
-              title={collapsed ? item.label : undefined}
+              title={collapsed ? t(item.key) : undefined}
               className={`w-full flex items-center gap-3 rounded-lg text-base md:text-sm font-medium transition ${
                 collapsed ? "justify-center px-2 py-2.5" : "px-3 py-2.5"
               } ${
@@ -115,7 +120,7 @@ export default function Sidebar() {
               }`}
             >
               <item.icon size={20} className="flex-shrink-0" />
-              {!collapsed && <span>{item.label}</span>}
+              {!collapsed && <span>{t(item.key)}</span>}
             </Link>
           );
         })}
@@ -123,6 +128,10 @@ export default function Sidebar() {
 
       {/* Bottom */}
       <div className="p-3 border-t border-border-default">
+        <div className="mb-3 flex justify-center gap-2">
+          <LanguageSwitcher />
+          <ThemeToggle />
+        </div>
         {user && !collapsed && (
           <div className="flex items-center gap-3 mb-3 px-1">
             <div className="w-8 h-8 rounded-full bg-accent-green/20 flex items-center justify-center text-accent-green text-sm font-bold flex-shrink-0">
@@ -140,13 +149,13 @@ export default function Sidebar() {
         )}
         <button
           onClick={handleLogout}
-          title={collapsed ? (isGuest ? "Exit Guest Mode" : "Log Out") : undefined}
+          title={collapsed ? (isGuest ? t('logout') : t('logout')) : undefined}
           className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-text-secondary hover:text-red-400 hover:bg-red-500/10 transition ${
             collapsed ? "justify-center" : ""
           }`}
         >
           <FiLogOut size={16} />
-          {!collapsed && (isGuest ? "Exit Guest Mode" : "Log Out")}
+          {!collapsed && t('logout')}
         </button>
       </div>
     </>

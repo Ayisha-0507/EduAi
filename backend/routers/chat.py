@@ -22,19 +22,12 @@ async def send_message(req: ChatRequest, user=Depends(get_current_user)):
     # Get user profile for persona preference
     profile = fb.get_user_profile(uid)
     persona = profile.get("tutor_persona", "Friendly Encourager")
-    mode = profile.get("model_selection_mode", "Auto")
-    manual_choice = profile.get("manual_model_choice", "deepseek")
 
     # Detect emotion
     emotion_name, emotion_prefix = ai.detect_emotion(req.message)
 
-    # Determine model
-    if req.model_hint:
-        model_hint = req.model_hint.value
-    elif mode == "Manual":
-        model_hint = manual_choice
-    else:
-        model_hint = ai.auto_route(req.message)
+    # Use Gemini for all requests
+    model_hint = "gemini-2.5-pro"
 
     # Build chat history from path if provided
     history = []
@@ -126,4 +119,4 @@ async def feynman_chat(req: FeynmanRequest, user=Depends(get_current_user)):
     if not reply:
         raise HTTPException(status_code=500, detail="AI returned empty response")
 
-    return ChatResponse(reply=reply, model_used="nous", emotion_detected="")
+    return ChatResponse(reply=reply, model_used="gemini", emotion_detected="")

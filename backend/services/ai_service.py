@@ -1,7 +1,7 @@
 """
 EduAI Backend — AI Service
-Handles all Gemini API calls, model routing, and prompt engineering.
-Ported from app.py's _call_openrouter, _auto_route, detect_emotion_and_adapt. OpenRouter logic removed.
+Handles all Gemini API calls and prompt engineering.
+Gemini-only — no OpenRouter or multi-model routing.
 """
 
 from __future__ import annotations
@@ -22,39 +22,15 @@ from config import settings
 # ── Model Selection ────────────────────────────────────────────────────────────
 
 def pick_model(hint: str | None = None) -> str:
-    """Resolve a model key to its full Gemini model ID."""
+    """Return the Gemini model ID from config.py, defaulting to gemini-2.5-pro."""
     if hint and hint in settings.AI_MODELS:
         return settings.AI_MODELS[hint]
-    return settings.AI_MODELS["deepseek"]
+    return settings.AI_MODELS["gemini-2.5-pro"]
 
 
 def auto_route(prompt: str) -> str:
-    """Pick the best model key based on keyword analysis of the prompt."""
-    p = prompt.lower()
-
-    code_kw = [
-        "code", "python", "javascript", "function", "debug", "programming",
-        "algorithm", "api", "html", "css", "sql", "compile", "syntax",
-    ]
-    visual_kw = [
-        "diagram", "chart", "textbook", "graph", "table", "figure",
-        "image", "photo", "picture", "screenshot", "slide", "video",
-        "lecture", "handwriting", "scan", "document", "pdf",
-    ]
-    science_visual_kw = [
-        "visual", "physics", "chemistry", "biology", "science",
-        "experiment", "formula", "lab", "interactive",
-    ]
-    reason_kw = [
-        "solve", "calculate", "math", "proof", "derive", "equation",
-        "reason", "logic", "quiz", "step-by-step", "analyze",
-    ]
-    rp_kw = [
-        "act as", "roleplay", "simulate", "pretend", "character",
-        "you are a", "curious student", "feynman", "group discussion",
-    ]
-
-    return "deepseek"
+    """Default to gemini-2.5-pro; routing logic can be added if needed."""
+    return "gemini-2.5-pro"
 
 
 # ── Emotion Detection ──────────────────────────────────────────────────────────
@@ -307,10 +283,10 @@ def generate_flashcards(topic: str, num_cards: int = 10) -> list[dict]:
         {"role": "system", "content": "You are a flashcard generator. Return ONLY a JSON array of objects with 'question' and 'answer' keys. No markdown, no explanation, no code fences."},
         {"role": "user", "content": f"Generate exactly {num_cards} educational flashcards about: {topic}. Each card should test a key concept. Return as JSON array."},
     ]
-    resp = call_ai(messages, model_hint="arcee", is_json=True)
+    resp = call_ai(messages, model_hint="gemini-2.5-pro", is_json=True)
     if not resp:
         # Retry without JSON mode in case model doesn't support it
-        resp = call_ai(messages, model_hint="arcee", is_json=False)
+        resp = call_ai(messages, model_hint="gemini-2.5-pro", is_json=False)
     if resp:
         try:
             # Strip markdown code fences if present
@@ -374,7 +350,7 @@ def generate_learning_path_topics(goal: str) -> list[str]:
         {"role": "system", "content": "You are a curriculum designer. Return ONLY a JSON array of 5-7 topic strings for a learning path. No explanations."},
         {"role": "user", "content": f"Create a learning path for: {goal}"},
     ]
-    resp = call_ai(messages, model_hint="deepseek", is_json=True)
+    resp = call_ai(messages, model_hint="gemini-2.5-pro", is_json=True)
     if resp:
         try:
             data = json.loads(resp)
@@ -403,7 +379,7 @@ def generate_quiz(topic: str, num_questions: int = 5) -> list[dict] | None:
         },
         {"role": "user", "content": f"Topic: {topic}"},
     ]
-    resp = call_ai(messages, model_hint="deepseek", is_json=True)
+    resp = call_ai(messages, model_hint="gemini-2.5-pro", is_json=True)
     return parse_quiz_response(resp)
 
 
@@ -454,7 +430,7 @@ def generate_career_paths(interests: str, skills: str, education: str, location:
         {"role": "system", "content": "You are a career counselor AI."},
         {"role": "user", "content": prompt},
     ]
-    return call_ai(messages, model_hint="deepseek") or ""
+    return call_ai(messages, model_hint="gemini-2.5-pro") or ""
 
 
 def generate_skills_gap(skills: str) -> dict | None:
@@ -463,7 +439,7 @@ def generate_skills_gap(skills: str) -> dict | None:
         {"role": "system", "content": "Return ONLY a JSON object with skill names as keys and proficiency 0-100 as values. No markdown."},
         {"role": "user", "content": f"Based on these current skills ({skills}), rate proficiency for 6-8 relevant career skills."},
     ]
-    resp = call_ai(messages, model_hint="deepseek", is_json=True)
+    resp = call_ai(messages, model_hint="gemini-2.5-pro", is_json=True)
     if resp:
         try:
             return json.loads(resp) if isinstance(resp, str) else resp
@@ -489,7 +465,7 @@ def generate_summary(text: str, format_name: str) -> str:
         {"role": "system", "content": "You are an educational summarizer."},
         {"role": "user", "content": f"Instructions: {instruction}\n\nTEXT TO SUMMARIZE:\n{truncated}"},
     ]
-    return call_ai(messages, model_hint="arcee") or ""
+    return call_ai(messages, model_hint="gemini-2.5-pro") or ""
 
 
 def generate_feynman_response(user_message: str, history: list[dict]) -> str:
@@ -505,7 +481,7 @@ def generate_feynman_response(user_message: str, history: list[dict]) -> str:
     for msg in history[-20:]:
         messages.append({"role": msg["role"], "content": msg["content"]})
     messages.append({"role": "user", "content": user_message})
-    return call_ai(messages, model_hint="nous") or ""
+    return call_ai(messages, model_hint="gemini-2.5-pro") or ""
 
 
 # ── Debate Arena ─────────────────────────────────────────────────────────────
@@ -551,9 +527,9 @@ def debate_round(
             {"role": "system", "content": system},
             {"role": "user", "content": f"Begin your opening argument {ai_stance} the topic: {topic}"},
         ]
-        resp = call_ai(messages, model_hint="deepseek", is_json=True)
+        resp = call_ai(messages, model_hint="gemini-2.5-pro", is_json=True)
         if not resp:
-            resp = call_ai(messages, model_hint="deepseek", is_json=False)
+            resp = call_ai(messages, model_hint="gemini-2.5-pro", is_json=False)
 
         ai_arg = topic  # fallback
         if resp:
@@ -602,9 +578,9 @@ def debate_round(
         messages.append({"role": "assistant", "content": f"Previous rounds:{history_text}"})
     messages.append({"role": "user", "content": f"Student's argument ({user_stance}): {user_argument}"})
 
-    resp = call_ai(messages, model_hint="deepseek", is_json=True)
+    resp = call_ai(messages, model_hint="gemini-2.5-pro", is_json=True)
     if not resp:
-        resp = call_ai(messages, model_hint="deepseek", is_json=False)
+        resp = call_ai(messages, model_hint="gemini-2.5-pro", is_json=False)
 
     # Parse response
     result = {
@@ -663,9 +639,9 @@ def debate_final(topic: str, user_stance: str, history: list[dict]) -> dict:
         {"role": "user", "content": "Judge this debate and provide the final verdict."},
     ]
 
-    resp = call_ai(messages, model_hint="deepseek", is_json=True)
+    resp = call_ai(messages, model_hint="gemini-2.5-pro", is_json=True)
     if not resp:
-        resp = call_ai(messages, model_hint="deepseek", is_json=False)
+        resp = call_ai(messages, model_hint="gemini-2.5-pro", is_json=False)
 
     # Defaults
     result = {

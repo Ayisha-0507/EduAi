@@ -1,0 +1,19 @@
+{
+  "appName": "एडुएआई",
+  "login": "लॉगिन करें",
+  "logout": "लॉग आउट",
+  "homeChat": "होम चैट",
+  "visionSolver": "विज़न सॉल्वर",
+  "flashcards": "फ्लैशकार्ड्स",
+  "debateArena": "बहस क्षेत्र",
+  "learningPaths": "लर्निंग पाथ्स",
+  "dashboard": "डैशबोर्ड",
+  "feynmanBoard": "फेनमैन बोर्ड",
+  "careerPath": "करियर पाथ",
+  "summarizer": "सारांशक",
+  "settings": "सेटिंग्स",
+  "myProfile": "मेरा प्रोफ़ाइल",
+  "about": "एडुएआई के बारे में",
+  "language": "भाषा",
+  "selectLanguage": "भाषा चुनें"
+}

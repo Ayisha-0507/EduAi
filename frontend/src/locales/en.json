@@ -1,0 +1,19 @@
+{
+  "appName": "EduAI",
+  "login": "Login",
+  "logout": "Log Out",
+  "homeChat": "Home Chat",
+  "visionSolver": "Vision Solver",
+  "flashcards": "Flashcards",
+  "debateArena": "Debate Arena",
+  "learningPaths": "Learning Paths",
+  "dashboard": "Dashboard",
+  "feynmanBoard": "Feynman Board",
+  "careerPath": "Career Path",
+  "summarizer": "Summarizer",
+  "settings": "Settings",
+  "myProfile": "My Profile",
+  "about": "About EduAI",
+  "language": "Language",
+  "selectLanguage": "Select Language"
+}

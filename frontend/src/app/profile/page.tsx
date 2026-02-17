@@ -51,7 +51,7 @@ export default function ProfilePage() {
 
   const handleLogout = () => {
     logout();
-    window.location.href = "/";
+    window.location.href = "/login";
   };
 
   const initial = (user?.nickname || user?.email || "?")[0].toUpperCase();
