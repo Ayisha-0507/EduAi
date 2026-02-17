@@ -1,3 +1,21 @@
+# ── Video Generation ─────────────────────────────────────────────────────────
+from models.schemas import VideoRequest, VideoResponse
+
+@router.post("/video", response_model=VideoResponse)
+async def video_generate(req: VideoRequest):
+    """Generate a video using the Veo model from a text prompt."""
+    import asyncio
+    if not req.prompt.strip():
+        raise HTTPException(status_code=400, detail="Prompt cannot be empty")
+    try:
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: ai.generate_video(req.prompt),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return VideoResponse(**result)
 """
 EduAI Backend — Tools Router
 Career path, summarizer, and dashboard endpoints.

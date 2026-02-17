@@ -1,3 +1,10 @@
+# ── Video Generation ─────────────────────────────────────────────────────────
+class VideoRequest(BaseModel):
+    prompt: str
+
+class VideoResponse(BaseModel):
+    video_url: str
+    model_used: str
 """
 EduAI Backend — Pydantic Schemas
 Request/response models for all API endpoints.

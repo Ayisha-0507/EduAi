@@ -1,3 +1,20 @@
+
+# ── Video Generation (Veo) ─────────────────────────────────────────────
+def generate_video(prompt: str) -> dict:
+    """Generate a video using the Veo model from a text prompt."""
+    import google.generativeai as genai
+    import os
+    api_key = os.getenv("GEMINI_API_KEY", getattr(settings, "GEMINI_API_KEY", None))
+    if not api_key:
+        api_key = os.getenv("GOOGLE_STUDIO_API_KEY", getattr(settings, "GOOGLE_STUDIO_API_KEY", None))
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY or GOOGLE_STUDIO_API_KEY not set in environment or settings.")
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel("models/veo-3.1-generate-preview")
+    response = model.generate_content([prompt])
+    # The response may contain a video URL or base64, depending on API
+    video_url = getattr(response, 'video_url', None) or getattr(response, 'media_url', None) or str(response)
+    return {"video_url": video_url, "model_used": "models/veo-3.1-generate-preview"}
 """
 EduAI Backend — AI Service
 Handles all Gemini API calls and prompt engineering.
@@ -261,7 +278,7 @@ def solve_vision(image_base64: str, prompt: str = "This is an educational proble
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY or GOOGLE_STUDIO_API_KEY not set in environment or settings.")
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-pro-vision")
+    model = genai.GenerativeModel("models/imagen-4.0-generate-001")
     # Decode base64 image
     image_bytes = base64.b64decode(image_base64)
     # Gemini expects a PIL Image
@@ -274,7 +291,7 @@ def solve_vision(image_base64: str, prompt: str = "This is an educational proble
         image
     ])
     answer = response.text.strip() if hasattr(response, 'text') else str(response)
-    return answer, "gemini-pro-vision"
+    return answer, "models/imagen-4.0-generate-001"
 
 
 def generate_flashcards(topic: str, num_cards: int = 10) -> list[dict]:

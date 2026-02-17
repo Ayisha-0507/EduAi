@@ -1,3 +1,8 @@
+// Imports and logic are handled below. This section intentionally left blank to remove duplicate code.
+
+// ...existing constants and helpers...
+
+// (Removed duplicate ChatPage implementation)
 "use client";
 
 /**
