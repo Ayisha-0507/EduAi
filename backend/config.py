@@ -23,6 +23,7 @@ class Settings:
         "gemini-2.0-flash-lite": "models/gemini-2.0-flash-lite",
         "gemini-exp-1206": "models/gemini-exp-1206",
         "gemini-2.5-flash-preview-tts": "models/gemini-2.5-flash-preview-tts",
+        "deepseek": "deepseek",
     }
     # Fallback models if primary fails (tried in order)
     FALLBACK_MODELS: list = [
