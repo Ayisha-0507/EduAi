@@ -135,59 +135,66 @@ def _is_rate_limit_error(err: Exception) -> bool:
     err_str = str(err).lower()
     return "429" in err_str or "rate limit" in err_str or "rate_limit" in err_str or "too many requests" in err_str
 
+
 def call_ai(
     messages: list[dict],
     model_hint: str | None = None,
     is_json: bool = False,
     temperature: float = 0.7,
 ) -> str | None:
-    """Send a request directly to Google Gemini API with automatic retry and safety handling."""
+    """Bulletproof direct Gemini API call with safe history merging and strict error catching."""
     
-    # Get API key from env and clean it
     raw_key = os.getenv("GEMINI_API_KEY", getattr(settings, "GEMINI_API_KEY", ""))
     api_key = raw_key.strip().strip('"\'') 
     
     if not api_key:
-        raise RuntimeError("GEMINI_API_KEY not set in environment or settings.")
+        return "API Error: GEMINI_API_KEY is missing."
     
     genai.configure(api_key=api_key)
 
-    # 1. Parse messages
     system_instruction = ""
-    gemini_history = []
+    contents = []
+    last_role = None
     
+    # 1. Safely parse messages and merge consecutive roles to prevent crash
     for msg in messages:
+        content = msg.get("content", "").strip()
+        if not content:
+            continue
+            
         if msg["role"] == "system":
-            system_instruction += msg["content"] + "\n"
+            system_instruction += content + "\n"
         elif msg["role"] in ["user", "assistant"]:
             role = "user" if msg["role"] == "user" else "model"
-            gemini_history.append({"role": role, "parts": [msg["content"]]})
+            
+            # Gemini strictly requires alternating roles. Merge if same role repeats.
+            if role == last_role and contents:
+                contents[-1]["parts"][0] += "\n\n" + content
+            else:
+                contents.append({"role": role, "parts": [content]})
+                last_role = role
     
-    if not gemini_history:
-        return None
-        
-    last_user_message = gemini_history.pop()["parts"][0]
+    if not contents:
+        return "Hello! How can I help you today?"
 
-    # 2. Setup Model Config
-    model_id = "gemini-2.5-pro"
+    # 2. Setup stable model
+    model_id = "gemini-1.5-pro"
         
     generation_config = genai.types.GenerationConfig(
         temperature=temperature,
-        max_output_tokens=1024,
+        max_output_tokens=2048,
     )
-    
     if is_json:
         generation_config.response_mime_type = "application/json"
 
-    # 3. Setup Safety Settings (Prevents false positive blocks)
+    # 3. Use BLOCK_ONLY_HIGH (BLOCK_NONE causes errors on free tier accounts)
     safety_settings = {
-        HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+        HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+        HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+        HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+        HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
     }
 
-    # 4. Initialize Model and Chat session
     model = genai.GenerativeModel(
         model_name=model_id,
         system_instruction=system_instruction.strip() if system_instruction else None,
@@ -195,19 +202,16 @@ def call_ai(
         safety_settings=safety_settings
     )
     
-    chat = model.start_chat(history=gemini_history)
-    
-    # 5. Call API with rate limit retries & Safe Text Extraction
+    # 4. Call API directly without maintaining strict chat state
     for attempt in range(1 + settings.RATE_LIMIT_RETRIES):
         try:
-            response = chat.send_message(last_user_message)
+            response = model.generate_content(contents)
             
-            # Safely extract text to prevent "finish_reason is 2" crashes
-            try:
+            if response.parts:
                 return response.text
-            except ValueError:
-                # Fallback message if AI blocks the response
-                return "Oops! Edu AI safety filters got triggered or the response was cut off. Can you rephrase that?"
+            else:
+                reason = response.candidates[0].finish_reason if response.candidates else "Unknown"
+                return f"API Blocked Response. Reason code: {reason}"
                 
         except Exception as err:
             err_str = str(err).lower()
@@ -215,10 +219,9 @@ def call_ai(
                 if attempt < settings.RATE_LIMIT_RETRIES:
                     time.sleep(settings.RATE_LIMIT_DELAY * (attempt + 1))
                     continue
-            raise RuntimeError(f"Gemini API error ({model_id}): {err}")
+            return f"API Error caught: {str(err)}"
             
-    return None
-
+    return "Failed to get response after retries."
 def solve_vision(image_base64: str, prompt: str = "This is an educational problem. Solve it step-by-step and provide a clear explanation.") -> tuple[str, str]:
     """Send an image to Gemini vision model for analysis."""
     import google.generativeai as genai
