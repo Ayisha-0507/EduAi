@@ -14,6 +14,7 @@ import httpx
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 import os
 import random
+from google import genai # <--- Ithu 'google.generativeai' nu irukka koodathu!
 import base64
 from google.genai import types
 from config import settings
@@ -137,40 +138,59 @@ def call_ai(
 ) -> str | None:
     """Straightforward Gemini 2.5 Pro call without any rotations."""
     
+
     # 1. Setup API Key from Environment
     api_key = os.getenv("GEMINI_API_KEY", "").strip().strip('"')
     if not api_key:
         return "API Error: GEMINI_API_KEY is missing in environment variables."
 
-    client = genai.Client(api_key=api_key)
+    # 2. Prepare payload for Gemini REST API
+    system_instruction = ""
+    messages_payload = []
+    for msg in messages:
+        if msg["role"] == "system":
+            system_instruction += msg["content"] + "\n"
+        else:
+            messages_payload.append({
+                "role": msg["role"],
+                "content": msg["content"]
+            })
+
+    # 3. Compose the request
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_hint or 'gemini-2.5-pro'}:generateContent?key={api_key}"
+    payload = {
+        "contents": [
+            {"role": "system", "content": system_instruction.strip()} if system_instruction.strip() else None,
+            *messages_payload
+        ]
+    }
+    # Remove None if no system message
+    payload["contents"] = [c for c in payload["contents"] if c]
+    if temperature is not None:
+        payload["generationConfig"] = {"temperature": temperature}
+    if is_json:
+        payload["generationConfig"] = payload.get("generationConfig", {})
+        payload["generationConfig"]["response_mime_type"] = "application/json"
+    else:
+        payload["generationConfig"] = payload.get("generationConfig", {})
+        payload["generationConfig"]["response_mime_type"] = "text/plain"
 
     try:
-        # 2. Format contents for SDK 2.0
-        system_instruction = ""
-        contents = []
-        for msg in messages:
-            if msg["role"] == "system":
-                system_instruction += msg["content"] + "\n"
-            else:
-                role = "user" if msg["role"] == "user" else "model"
-                contents.append(types.Content(role=role, parts=[types.Part(text=msg["content"])]))
-
-        # 3. Direct Call to Gemini 2.5 Pro
-        config = types.GenerateContentConfig(
-            system_instruction=system_instruction.strip() if system_instruction else None,
-            temperature=temperature,
-            max_output_tokens=2048
-        )
-
-        response = client.models.generate_content(
-            model=model_hint,
-            contents=contents,
-            config=config
-        )
-        
-        return response.text
+        resp = httpx.post(url, json=payload, timeout=20.0)
+        if resp.status_code == 200:
+            data = resp.json()
+            # Gemini API returns candidates[0].content.parts[0].text or similar
+            candidates = data.get("candidates")
+            if candidates and "content" in candidates[0]:
+                parts = candidates[0]["content"].get("parts")
+                if parts and "text" in parts[0]:
+                    return parts[0]["text"]
+            # Fallback: try to return the whole response
+            return str(data)
+        else:
+            return f"Gemini API Error: {resp.status_code} {resp.text}"
     except Exception as e:
-        return f"Gemini 2.5 Pro Error: {str(e)}"
+        return f"Gemini REST API Error: {str(e)}"
 
     # 3. Handle Fallbacks & Model Selection
     primary_model = pick_model(model_hint) # Uses your gemini-2.5-pro etc.
