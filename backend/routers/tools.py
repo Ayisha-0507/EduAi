@@ -282,3 +282,36 @@ async def greeting(user=Depends(get_current_user)):
         total_messages=total_msgs,
         date_display=g["date_display"],
     )
+
+from fastapi import APIRouter
+from pydantic import BaseModel
+from services import ai_service as ai
+
+
+class ProblemRequest(BaseModel):
+    problem_description: str
+
+@router.post("/problem-to-project")
+async def convert_problem(request: ProblemRequest):
+    # Unoda visionary goals-ah system prompt-la add panni irukkaen [cite: 2025-04-02]
+    system_prompt = """
+    You are a 'Social Innovation Engineer'. 
+    Your goal is to take a social problem and convert it into a BTech-level IT project.
+    Your mission: Destroy religious barriers, encourage unity, and uplift backward people [cite: 2025-04-02].
+    
+    Structure the response in Markdown:
+    1. **Project Title**: (Inspiring name)
+    2. **Technical Domain**: (e.g., AI, IoT, Web)
+    3. **The Solution**: (How it solves the problem technically)
+    4. **Social Impact**: (How it helps backward people or builds unity) [cite: 2025-04-02]
+    5. **Roadmap**: (Phase 1, 2, and 3)
+    """
+    
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": f"The problem is: {request.problem_description}"}
+    ]
+    
+    # Direct Gemini 2.5 Pro call
+    roadmap = ai.call_ai(messages, model_hint="gemini-2.5-pro")
+    return {"roadmap": roadmap}
