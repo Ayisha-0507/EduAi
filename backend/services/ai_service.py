@@ -1,3 +1,13 @@
+from __future__ import annotations
+import json
+import re
+import config
+import time
+import google.generativeai as genai
+import httpx
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
+import os
+from config import settings
 
 # ── Video Generation (Veo) ─────────────────────────────────────────────
 def generate_video(prompt: str) -> dict:
@@ -20,20 +30,6 @@ EduAI Backend — AI Service
 Handles all Gemini API calls and prompt engineering.
 Gemini-only — no OpenRouter or multi-model routing.
 """
-
-from __future__ import annotations
-import json
-import re
-import time
-import google.generativeai as genai
-import httpx
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
-import os
-
-from config import settings
-
-
-
 
 
 # ── Model Selection ────────────────────────────────────────────────────────────
