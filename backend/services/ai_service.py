@@ -124,61 +124,54 @@ def _is_rate_limit_error(err: Exception) -> bool:
     """Check if an error is a rate-limit (429) error."""
     err_str = str(err).lower()
     return "429" in err_str or "rate limit" in err_str or "rate_limit" in err_str or "too many requests" in err_str
-def get_gemini_client():
-    """Gets a random API key from the environment pool for rotation."""
-    # Render-la GEMINI_KEYS_POOL=key1,key2,key3,key4 nu set pannanum
-    keys_pool = os.getenv("GEMINI_KEYS_POOL", "")
-    
-    if keys_pool:
-        keys_list = [k.strip() for k in keys_pool.split(",")]
-        selected_key = random.choice(keys_list) # Simple & Effective rotation
-    else:
-        # Fallback to single key
-        selected_key = os.getenv("GEMINI_API_KEY", "")
 
-    return genai.Client(api_key=selected_key)
+from __future__ import annotations
+from google import genai # Modern SDK 2.0
+from google.genai import types
+import os
+from config import settings
+
 def call_ai(
-    messages: list[dict],
-    model_hint: str | None = None,
-    is_json: bool = False,
-    temperature: float = 0.7,
+    messages: list[dict], 
+    model_hint: str = "gemini-2.5-pro", # Unoda fav model
+    temperature: float = 0.7
 ) -> str | None:
-    """Modern Gemini 2.0 SDK call with role merging and fallback support."""
+    """Straightforward Gemini 2.5 Pro call without any rotations."""
     
-    # 1. Setup API Key
-    raw_key = os.getenv("GEMINI_API_KEY", getattr(settings, "GEMINI_API_KEY", ""))
-    api_key = raw_key.strip().strip('"\'')
+    # 1. Setup API Key from Environment
+    api_key = os.getenv("GEMINI_API_KEY", "").strip().strip('"')
     if not api_key:
-        return "API Error: GEMINI_API_KEY is missing."
+        return "API Error: GEMINI_API_KEY is missing in environment variables."
 
     client = genai.Client(api_key=api_key)
 
-    # 2. Extract System Instruction & Format Contents
-    system_instruction = ""
-    formatted_contents = []
-    last_role = None
-
-    for msg in messages:
-        content = msg.get("content", "").strip()
-        if not content: continue
-
-        if msg["role"] == "system":
-            system_instruction += content + "\n"
-        else:
-            # SDK 2.0 uses 'user' and 'model'
-            role = "user" if msg["role"] == "user" else "model"
-            
-            # Bulletproof Role Merging
-            if role == last_role and formatted_contents:
-                formatted_contents[-1].parts[0].text += "\n\n" + content
+    try:
+        # 2. Format contents for SDK 2.0
+        system_instruction = ""
+        contents = []
+        for msg in messages:
+            if msg["role"] == "system":
+                system_instruction += msg["content"] + "\n"
             else:
-                formatted_contents.append(
-                    types.Content(role=role, parts=[types.Part(text=content)])
-                )
-                last_role = role
+                role = "user" if msg["role"] == "user" else "model"
+                contents.append(types.Content(role=role, parts=[types.Part(text=msg["content"])]))
 
-    if not formatted_contents:
-        return "Hello! How can I help you today?"
+        # 3. Direct Call to Gemini 2.5 Pro
+        config = types.GenerateContentConfig(
+            system_instruction=system_instruction.strip() if system_instruction else None,
+            temperature=temperature,
+            max_output_tokens=2048
+        )
+
+        response = client.models.generate_content(
+            model=model_hint,
+            contents=contents,
+            config=config
+        )
+        
+        return response.text
+    except Exception as e:
+        return f"Gemini 2.5 Pro Error: {str(e)}"
 
     # 3. Handle Fallbacks & Model Selection
     primary_model = pick_model(model_hint) # Uses your gemini-2.5-pro etc.
