@@ -1,4 +1,8 @@
 from __future__ import annotations
+from google import genai # Modern SDK 2.0
+from google.genai import types
+import os
+from config import settings
 import json
 import re
 import config
@@ -125,11 +129,6 @@ def _is_rate_limit_error(err: Exception) -> bool:
     err_str = str(err).lower()
     return "429" in err_str or "rate limit" in err_str or "rate_limit" in err_str or "too many requests" in err_str
 
-from __future__ import annotations
-from google import genai # Modern SDK 2.0
-from google.genai import types
-import os
-from config import settings
 
 def call_ai(
     messages: list[dict], 
