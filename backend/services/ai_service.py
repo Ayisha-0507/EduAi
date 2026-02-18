@@ -2,11 +2,14 @@ from __future__ import annotations
 import json
 import re
 import config
+from PIL import Image
+from io import BytesIO
 import time
 import google.generativeai as genai
 import httpx
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 import os
+import base64
 from config import settings
 def generate_video(prompt: str) -> dict:
     """Generate a video using the Veo model from a text prompt."""
@@ -263,9 +266,6 @@ def call_ai(
     return "Failed to get response after retries."
 def solve_vision(image_base64: str, prompt: str = "This is an educational problem. Solve it step-by-step and provide a clear explanation.") -> tuple[str, str]:
     """Send an image to Gemini vision model for analysis."""
-    import google.generativeai as genai
-    import base64
-    import os
     api_key = os.getenv("GEMINI_API_KEY", getattr(settings, "GEMINI_API_KEY", None))
     if not api_key:
         api_key = os.getenv("GOOGLE_STUDIO_API_KEY", getattr(settings, "GOOGLE_STUDIO_API_KEY", None))
@@ -276,8 +276,6 @@ def solve_vision(image_base64: str, prompt: str = "This is an educational proble
     # Decode base64 image
     image_bytes = base64.b64decode(image_base64)
     # Gemini expects a PIL Image
-    from PIL import Image
-    from io import BytesIO
     image = Image.open(BytesIO(image_bytes))
     # Run Gemini vision
     response = model.generate_content([
