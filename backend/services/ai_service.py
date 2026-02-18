@@ -10,11 +10,10 @@ import httpx
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 import os
 import base64
+from google.genai import types
 from config import settings
 def generate_video(prompt: str) -> dict:
     """Generate a video using the Veo model from a text prompt."""
-    import google.generativeai as genai
-    import os
     api_key = os.getenv("GEMINI_API_KEY", getattr(settings, "GEMINI_API_KEY", None))
     if not api_key:
         api_key = os.getenv("GOOGLE_STUDIO_API_KEY", getattr(settings, "GOOGLE_STUDIO_API_KEY", None))
@@ -125,67 +124,82 @@ def _is_rate_limit_error(err: Exception) -> bool:
     err_str = str(err).lower()
     return "429" in err_str or "rate limit" in err_str or "rate_limit" in err_str or "too many requests" in err_str
 
-
 def call_ai(
     messages: list[dict],
     model_hint: str | None = None,
     is_json: bool = False,
     temperature: float = 0.7,
 ) -> str | None:
-    """Bulletproof direct Gemini API call with safe history merging and strict error catching."""
+    """Modern Gemini 2.0 SDK call with role merging and fallback support."""
     
+    # 1. Setup API Key
     raw_key = os.getenv("GEMINI_API_KEY", getattr(settings, "GEMINI_API_KEY", ""))
-    api_key = raw_key.strip().strip('"\'') 
-    
+    api_key = raw_key.strip().strip('"\'')
     if not api_key:
         return "API Error: GEMINI_API_KEY is missing."
-    
-    genai.configure(api_key=api_key)
 
+    client = genai.Client(api_key=api_key)
+
+    # 2. Extract System Instruction & Format Contents
     system_instruction = ""
-    contents = []
+    formatted_contents = []
     last_role = None
-    
-    # 1. Safely parse messages and merge consecutive roles to prevent crash
+
     for msg in messages:
         content = msg.get("content", "").strip()
-        if not content:
-            continue
-            
+        if not content: continue
+
         if msg["role"] == "system":
             system_instruction += content + "\n"
-        elif msg["role"] in ["user", "assistant"]:
+        else:
+            # SDK 2.0 uses 'user' and 'model'
             role = "user" if msg["role"] == "user" else "model"
             
-            # Gemini strictly requires alternating roles. Merge if same role repeats.
-            if role == last_role and contents:
-                contents[-1]["parts"][0] += "\n\n" + content
+            # Bulletproof Role Merging
+            if role == last_role and formatted_contents:
+                formatted_contents[-1].parts[0].text += "\n\n" + content
             else:
-                contents.append({"role": role, "parts": [content]})
+                formatted_contents.append(
+                    types.Content(role=role, parts=[types.Part(text=content)])
+                )
                 last_role = role
-    
-    if not contents:
+
+    if not formatted_contents:
         return "Hello! How can I help you today?"
 
-    # 2. Setup stable model
-    model_id = "gemini-1.5-pro"
-    generation_config = genai.types.GenerationConfig()
-
-    api_key = os.getenv("GEMINI_API_KEY", getattr(settings, "GEMINI_API_KEY", None))
-    if not api_key:
-        api_key = os.getenv("GOOGLE_STUDIO_API_KEY", getattr(settings, "GOOGLE_STUDIO_API_KEY", None))
-    if not api_key:
-        raise RuntimeError("GEMINI_API_KEY or GOOGLE_STUDIO_API_KEY not set in environment or settings.")
-
-    genai.configure(api_key=api_key)
-
-    # Build ordered candidate list: hinted model, configured fallbacks
-    primary_model = pick_model(model_hint)
-    candidates: list[str] = [primary_model]
-    if getattr(settings, "FALLBACK_MODELS", None):
+    # 3. Handle Fallbacks & Model Selection
+    primary_model = pick_model(model_hint) # Uses your gemini-2.5-pro etc.
+    candidates = [primary_model]
+    if hasattr(settings, "FALLBACK_MODELS"):
         for m in settings.FALLBACK_MODELS:
-            if m not in candidates:
-                candidates.append(m)
+            if m not in candidates: candidates.append(m)
+
+    # 4. Try Candidates
+    for model_id in candidates:
+        try:
+            # Setup Config
+            config = types.GenerateContentConfig(
+                system_instruction=system_instruction.strip() if system_instruction else None,
+                temperature=temperature,
+                response_mime_type="application/json" if is_json else "text/plain",
+                max_output_tokens=2048
+            )
+
+            response = client.models.generate_content(
+                model=model_id,
+                contents=formatted_contents,
+                config=config
+            )
+            
+            if response.text:
+                return response.text
+                
+        except Exception as e:
+            print(f"Failed with {model_id}: {str(e)}")
+            continue # Try next fallback
+
+    return "Sorry, all Gemini models are currently busy. Try again in a bit!"
+
 
     # Helper to fetch remote models from Google Studio if needed
     def _fetch_remote_models() -> list[str]:
