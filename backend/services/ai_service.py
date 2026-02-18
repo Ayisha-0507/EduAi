@@ -9,6 +9,7 @@ import google.generativeai as genai
 import httpx
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 import os
+import random
 import base64
 from google.genai import types
 from config import settings
@@ -123,7 +124,19 @@ def _is_rate_limit_error(err: Exception) -> bool:
     """Check if an error is a rate-limit (429) error."""
     err_str = str(err).lower()
     return "429" in err_str or "rate limit" in err_str or "rate_limit" in err_str or "too many requests" in err_str
+def get_gemini_client():
+    """Gets a random API key from the environment pool for rotation."""
+    # Render-la GEMINI_KEYS_POOL=key1,key2,key3,key4 nu set pannanum
+    keys_pool = os.getenv("GEMINI_KEYS_POOL", "")
+    
+    if keys_pool:
+        keys_list = [k.strip() for k in keys_pool.split(",")]
+        selected_key = random.choice(keys_list) # Simple & Effective rotation
+    else:
+        # Fallback to single key
+        selected_key = os.getenv("GEMINI_API_KEY", "")
 
+    return genai.Client(api_key=selected_key)
 def call_ai(
     messages: list[dict],
     model_hint: str | None = None,

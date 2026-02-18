@@ -1,5 +1,8 @@
-# ── Video Generation ─────────────────────────────────────────────────────────
+from __future__ import annotations
+import fastapi
+from fastapi import APIRouter
 from models.schemas import VideoRequest, VideoResponse
+from services import ai_service as ai
 router = APIRouter()
 
 @router.post("/video", response_model=VideoResponse)
