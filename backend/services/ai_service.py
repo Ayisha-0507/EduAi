@@ -8,8 +8,6 @@ import httpx
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 import os
 from config import settings
-
-# ── Video Generation (Veo) ─────────────────────────────────────────────
 def generate_video(prompt: str) -> dict:
     """Generate a video using the Veo model from a text prompt."""
     import google.generativeai as genai
