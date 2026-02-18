@@ -1,5 +1,6 @@
 # ── Video Generation ─────────────────────────────────────────────────────────
 from models.schemas import VideoRequest, VideoResponse
+router = APIRouter()
 
 @router.post("/video", response_model=VideoResponse)
 async def video_generate(req: VideoRequest):
