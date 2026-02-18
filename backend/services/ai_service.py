@@ -132,10 +132,11 @@ def _is_rate_limit_error(err: Exception) -> bool:
 
 
 def call_ai(
-    messages: list[dict], 
+    messages: list[dict],
     model_hint: str = "gemini-2.5-pro", # Unoda fav model
+    is_json: bool = False,
     temperature: float = 0.7
-) -> str | None:
+    ) -> str | None:
     """Straightforward Gemini 2.5 Pro call without any rotations."""
     
 
