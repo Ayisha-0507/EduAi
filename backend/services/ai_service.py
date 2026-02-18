@@ -137,61 +137,137 @@ def call_ai(
     is_json: bool = False,
     temperature: float = 0.7
     ) -> str | None:
-    """Straightforward Gemini 2.5 Pro call without any rotations."""
-    
 
-    # 1. Setup API Key from Environment
-    api_key = os.getenv("GEMINI_API_KEY", "").strip().strip('"')
+    """Modern Gemini 2.0 SDK call with role merging and fallback support."""
+    # 1. Setup API Key
+    api_key = os.getenv("GEMINI_API_KEY", getattr(settings, "GEMINI_API_KEY", ""))
     if not api_key:
-        return "API Error: GEMINI_API_KEY is missing in environment variables."
+        return "API Error: GEMINI_API_KEY is missing."
 
-    # 2. Prepare payload for Gemini REST API
+    import google.generativeai as genai
+    genai.configure(api_key=api_key)
+
+    # 2. Extract System Instruction & Format Contents
     system_instruction = ""
-    messages_payload = []
+    formatted_contents = []
     for msg in messages:
+        content = msg.get("content", "").strip()
+        if not content:
+            continue
         if msg["role"] == "system":
-            system_instruction += msg["content"] + "\n"
+            system_instruction += content + "\n"
         else:
-            messages_payload.append({
-                "role": msg["role"],
-                "content": msg["content"]
-            })
+            role = "user" if msg["role"] == "user" else "model"
+            formatted_contents.append({"role": role, "parts": [content]})
 
-    # 3. Compose the request
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_hint or 'gemini-2.5-pro'}:generateContent?key={api_key}"
-    payload = {
-        "contents": [
-            {"role": "system", "content": system_instruction.strip()} if system_instruction.strip() else None,
-            *messages_payload
-        ]
-    }
-    # Remove None if no system message
-    payload["contents"] = [c for c in payload["contents"] if c]
-    if temperature is not None:
-        payload["generationConfig"] = {"temperature": temperature}
-    if is_json:
-        payload["generationConfig"] = payload.get("generationConfig", {})
-        payload["generationConfig"]["response_mime_type"] = "application/json"
-    else:
-        payload["generationConfig"] = payload.get("generationConfig", {})
-        payload["generationConfig"]["response_mime_type"] = "text/plain"
+    # 3. Handle Fallbacks & Model Selection
+    primary_model = pick_model(model_hint)
+    candidates = [primary_model]
+    if hasattr(settings, "FALLBACK_MODELS"):
+        for m in settings.FALLBACK_MODELS:
+            if m not in candidates:
+                candidates.append(m)
 
-    try:
-        resp = httpx.post(url, json=payload, timeout=20.0)
-        if resp.status_code == 200:
-            data = resp.json()
-            # Gemini API returns candidates[0].content.parts[0].text or similar
-            candidates = data.get("candidates")
-            if candidates and "content" in candidates[0]:
-                parts = candidates[0]["content"].get("parts")
-                if parts and "text" in parts[0]:
-                    return parts[0]["text"]
-            # Fallback: try to return the whole response
-            return str(data)
+    # 4. Try Candidates
+    for model_id in candidates:
+        try:
+            model = genai.GenerativeModel(model_id)
+            # Merge system instruction as first user message if present
+            call_messages = []
+            if system_instruction.strip():
+                call_messages.append({"role": "user", "parts": [system_instruction.strip()]})
+            call_messages.extend(formatted_contents)
+            response = model.generate_content(call_messages, generation_config={"temperature": temperature})
+            if hasattr(response, "text"):
+                return response.text
+        except Exception as e:
+            print(f"Failed with {model_id}: {str(e)}")
+            continue
+
+    # Helper to fetch remote models from Google Studio if needed
+    def _fetch_remote_models() -> list[str]:
+        try:
+            import httpx
+            resp = httpx.get(f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}", timeout=10.0)
+            if resp.status_code == 200:
+                data = resp.json()
+                mods = [m.get("name") or m for m in data.get("models", [])]
+                return mods
+        except Exception:
+            pass
+        return []
+
+    # Convert OpenAI-style messages to Gemini prompt (for fallback)
+    prompt = ""
+    for msg in messages:
+        role = msg.get("role", "user")
+        content = msg.get("content", "")
+        if role == "system":
+            prompt += f"[System] {content}\n"
+        elif role == "assistant":
+            prompt += f"[AI] {content}\n"
         else:
-            return f"Gemini API Error: {resp.status_code} {resp.text}"
-    except Exception as e:
-        return f"Gemini REST API Error: {str(e)}"
+            prompt += f"[User] {content}\n"
+
+    last_err = None
+    tried = set()
+
+    # Try each candidate model with retry on rate limits
+    for model_id in candidates:
+        if not model_id or model_id in tried:
+            continue
+        tried.add(model_id)
+        try:
+            model = genai.GenerativeModel(model_id)
+            for attempt in range(1 + getattr(settings, "RATE_LIMIT_RETRIES", 0)):
+                try:
+                    response = model.generate_content(prompt, generation_config={"temperature": temperature}, safety_settings=None)
+                    answer = response.text.strip() if hasattr(response, "text") else str(response)
+                    return answer
+                except Exception as err:
+                    last_err = err
+                    if _is_rate_limit_error(err) and attempt < getattr(settings, "RATE_LIMIT_RETRIES", 0):
+                        import time
+                        time.sleep(getattr(settings, "RATE_LIMIT_DELAY", 1) * (attempt + 1))
+                        continue
+                    # If error suggests model not found/unsupported, break to try next candidate
+                    e = str(err).lower()
+                    if "not found" in e or "not supported" in e or "404" in e or "models/" in e:
+                        break
+                    # otherwise, stop retrying this model
+                    break
+        except Exception as err:
+            last_err = err
+            continue
+
+    # If all configured candidates failed, fetch remote models and try them
+    remote_models = _fetch_remote_models()
+    for model_id in remote_models:
+        if not model_id or model_id in tried:
+            continue
+        tried.add(model_id)
+        try:
+            model = genai.GenerativeModel(model_id)
+            for attempt in range(1 + getattr(settings, "RATE_LIMIT_RETRIES", 0)):
+                try:
+                    response = model.generate_content(prompt, generation_config={"temperature": temperature}, safety_settings=None)
+                    answer = response.text.strip() if hasattr(response, "text") else str(response)
+                    return answer
+                except Exception as err:
+                    last_err = err
+                    if _is_rate_limit_error(err) and attempt < getattr(settings, "RATE_LIMIT_RETRIES", 0):
+                        import time
+                        time.sleep(getattr(settings, "RATE_LIMIT_DELAY", 1) * (attempt + 1))
+                        continue
+                    break
+        except Exception as err:
+            last_err = err
+            continue
+
+    # If we reach here, all attempts failed
+    if last_err:
+        return f"API Error caught: {str(last_err)}"
+    return "Failed to get response after retries."
 
     # 3. Handle Fallbacks & Model Selection
     primary_model = pick_model(model_hint) # Uses your gemini-2.5-pro etc.
